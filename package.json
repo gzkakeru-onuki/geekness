@@ -14,14 +14,12 @@
     "@mui/icons-material": "^6.4.7",
     "@mui/material": "^6.4.7",
     "@supabase/supabase-js": "^2.49.1",
-    "@types/react-table": "^7.7.20",
     "next": "15.2.2",
     "prismjs": "^1.30.0",
     "react": "^19.0.0",
     "react-big-calendar": "^1.18.0",
     "react-dom": "^19.0.0",
-    "react-simple-code-editor": "^0.14.1",
-    "react-table": "^7.8.0"
+    "react-simple-code-editor": "^0.14.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
