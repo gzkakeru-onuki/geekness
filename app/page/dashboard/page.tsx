@@ -63,6 +63,7 @@ function DashboardContent() {
                             >
                                 <LogoutIcon className="mr-2" />Logout
                             </button>
+                            <button>test</button>
                         </li>
                     </ul>
                 </nav>
