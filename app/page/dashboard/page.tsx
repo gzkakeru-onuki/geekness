@@ -62,8 +62,7 @@ function DashboardContent() {
                                 className="flex items-center w-full text-left py-2 px-4 rounded hover:bg-gray-700"
                             >
                                 <LogoutIcon className="mr-2" />Logout
-                            </button>
-                            <button>test</button>
+                            </button>                            
                         </li>
                     </ul>
                 </nav>
