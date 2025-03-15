@@ -7,6 +7,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PersonIcon from '@mui/icons-material/Person';
 import HomeIcon from '@mui/icons-material/Home';
+import { supabase } from "@/app/utils/supabase";
 
 function DashboardContent() {
     const searchParams = useSearchParams();
@@ -23,16 +24,19 @@ function DashboardContent() {
         }
     }, [searchParams]);
 
-    const handleLogout = () => {
-        // ログアウト処理
-        console.log("ログアウトします");
+    const handleLogout = async () => {        
         // 本当にログアウトするか確認
         const confirmLogout = window.confirm("本当にログアウトしますか？");
         if (confirmLogout) {
             // ログアウト処理を実行
             console.log("ログアウトします");
-            // ログアウト後のリダイレクト
-            router.push("/");
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+                console.error(error);
+            }else {
+                console.log("logout success");
+                router.push("/");
+            }
         }
     };
 
