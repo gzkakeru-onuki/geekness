@@ -18,7 +18,7 @@ function SkillTestResultContent() {
     const [review, setReview] = useState("コードの効率性が高く、最適化されています。");
 
     useEffect(() => {
-        const type = searchParams.get("type");
+        const type = searchParams?.get("type");
         if (type === "recruiter") {
             setUserType("recruiter");
         } else {

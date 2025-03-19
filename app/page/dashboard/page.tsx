@@ -16,7 +16,7 @@ function DashboardContent() {
 
     useEffect(() => {
         // URLパラメータからユーザー種別を取得
-        const type = searchParams.get("type");
+        const type = searchParams?.get("type");
         if (type === "recruiter") {
             setUserType("recruiter");
         } else {

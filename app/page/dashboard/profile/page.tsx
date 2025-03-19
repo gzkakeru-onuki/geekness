@@ -1,10 +1,12 @@
 "use client";
+import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/utils/supabase";
 
-export default function Profile() {
-    const userType = useSearchParams().get("type");
+// プロフィールコンテンツコンポーネント
+function ProfileContent() {
+    const userType = useSearchParams()?.get("type");
     const [editing, setEditing] = useState(false);
     const [profile, setProfile] = useState<any>(null);
     const router = useRouter();
@@ -157,7 +159,7 @@ export default function Profile() {
                     ) : (
                         <p className="text-gray-700">{profile?.phone_number || "N/A"}</p>
                     )}
-                </div>                
+                </div>
                 <button
                     onClick={editing ? handleSaveProfile : handleEditToggle}
                     className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-300"
@@ -166,5 +168,20 @@ export default function Profile() {
                 </button>
             </div>
         </div>
+    );
+}
+
+// メインのプロフィールコンポーネント
+export default function Profile() {
+    return (
+        <Suspense
+            fallback={
+                <div className="flex items-center justify-center min-h-screen">
+                    <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500" />
+                </div>
+            }
+        >
+            <ProfileContent />
+        </Suspense>
     );
 }
