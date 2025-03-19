@@ -1,0 +1,46 @@
+-- スキルテストテーブル
+-- テストの基本情報を管理するメインテーブル
+CREATE TABLE skill_tests (
+    id UUID PRIMARY KEY,                                    -- テストを一意に識別するID
+    title VARCHAR(255) NOT NULL,                           -- テストの名称（例：「Pythonプログラミングテスト」）
+    company_name UUID NOT NULL,                              -- テストを作成した企業の名前
+    applicant_id　UUID NOT NULL,                                           --受験者（応募者）のID
+    time_limit INTEGER,                                    -- テストの制限時間（分単位）
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,        -- テストの作成日時
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP         -- テストの最終更新日時
+);  
+
+-- テスト問題テーブル
+-- 各テストに含まれる問題を管理するテーブル
+CREATE TABLE test_questions (
+    id UUID PRIMARY KEY,                                   -- 問題を一意に識別するID
+    test_id UUID NOT NULL,                                -- 紐付くテストのID（skill_tests.idを参照）
+    question_text TEXT,                                    -- 問題文の内容
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,        -- 問題の作成日時
+    FOREIGN KEY (test_id) REFERENCES skill_tests(id)       -- テストテーブルとの外部キー制約
+);
+
+-- テスト受験者テーブル
+-- 応募者のテスト受験状況を管理するテーブル
+CREATE TABLE test_applicants (
+    id UUID PRIMARY KEY,                                   -- 受験記録を一意に識別するID
+    test_id UUID NOT NULL,                                -- 受験したテストのID（skill_tests.idを参照）
+    applicant_id UUID NOT NULL,                           -- 受験者（応募者）のID
+    status VARCHAR(20),                                    -- 受験状況（pending:未受験, in_progress:受験中, completed:完了）
+    score INTEGER,                                         -- テストの合計得点（80点以上が合格基準）
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,        -- 受験記録の作成日時
+    FOREIGN KEY (test_id) REFERENCES skill_tests(id)       -- テストテーブルとの外部キー制約
+);
+
+-- 応募者回答テーブル
+-- 受験者の各問題に対する回答を管理するテーブル
+CREATE TABLE test_responses (
+    id UUID PRIMARY KEY,                                   -- 回答を一意に識別するID
+    applicant_id UUID NOT NULL,                           -- 回答した応募者のID
+    test_id UUID NOT NULL,                                -- 回答したテストのID（skill_tests.idを参照）
+    answer TEXT,                                          -- 応募者の回答内容
+    score INTEGER,                                         -- この回答に対する得点
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,        -- 回答の記録日時
+    FOREIGN KEY (applicant_id) REFERENCES test_applicants(id),  -- 応募者テーブルとの外部キー制約
+    FOREIGN KEY (test_id) REFERENCES skill_tests(id)       -- テストテーブルとの外部キー制約
+);

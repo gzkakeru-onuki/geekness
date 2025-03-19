@@ -13,7 +13,7 @@ export default function Login() {
     const [password, setPassword] = useState("");
     const router = useRouter();
 
-    const handleLogin = async (e: FormEvent) =>{
+    const handleLogin = async (e: FormEvent, userType: string) => {
         e.preventDefault();
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
@@ -21,15 +21,20 @@ export default function Login() {
         });
         if (error) {
             console.error(error);
-        }else {
+        } else {
+
             console.log("login success");
             console.log(data.user?.id, data.user?.email);
-            router.push("/page/dashboard?type=applicant");
+            if (userType === "applicant") {
+                router.push("/page/dashboard?type=applicant");
+            } else {
+                router.push("/page/dashboard?type=recruiter");
+            }
         }
     }
     return (
         <div className="container mx-auto px-6 py-12">
-            <h1 className="text-4xl font-extrabold text-center mb-8 text-gray-800">ログイン画面</h1>            
+            <h1 className="text-4xl font-extrabold text-center mb-8 text-gray-800">ログイン画面</h1>
             <div className="flex justify-center mb-8">
 
                 <button
@@ -47,10 +52,10 @@ export default function Login() {
                     <BusinessIcon className="mr-2" />企業担当者
                 </button>
             </div>
-                        
+
             <div className="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-lg">
                 {activeTab === "user" && (
-                    <form onSubmit={handleLogin}>
+                    <form onSubmit={(e) => handleLogin(e, "applicant")}>
                         <div className="mb-6">
                             <label className="block text-gray-700 font-semibold mb-2">メールアドレス</label>
                             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -59,9 +64,9 @@ export default function Login() {
                             <label className="block text-gray-700 font-semibold mb-2">パスワード</label>
                             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
-                        <Link href="/page/dashboard?type=applicant" type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-300 justify-center mx-auto">
+                        <button type="submit" value="applicant" className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-300 justify-center mx-auto">
                             <LoginIcon className="mr-2" />ログイン
-                        </Link>
+                        </button>
                         <Link href="/auth/signup">
                             <p className="text-center text-gray-700 font-semibold mt-2 hover:text-blue-600">新規登録はこちら</p>
                         </Link>
@@ -69,7 +74,7 @@ export default function Login() {
                 )}
 
                 {activeTab === "company" && (
-                    <form>                        
+                    <form onSubmit={(e) => handleLogin(e, "recruiter")}>
                         <div className="mb-6">
                             <label className="block text-gray-700 font-semibold mb-2">メールアドレス</label>
                             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -79,9 +84,9 @@ export default function Login() {
                             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
 
-                        <Link href="/page/dashboard?type=recruiter" type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-300">
+                        <button value="recruiter" type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-300">
                             ログイン
-                        </Link>
+                        </button>
 
                         <Link href="/auth/signup">
                             <p className="text-center text-gray-700 font-semibold mt-2 hover:text-blue-600">新規登録はこちら</p>
