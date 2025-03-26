@@ -43,7 +43,7 @@ export default function Register() {
 
             if (profileError) throw profileError;
 
-            router.push("/dashboard");
+            router.push("/page/dashboard");
         } catch (error) {
             console.error("Error in signup:", error);
             setError("アカウントの作成に失敗しました");

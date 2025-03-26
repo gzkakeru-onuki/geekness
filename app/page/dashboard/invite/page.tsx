@@ -24,21 +24,24 @@ export default function InviteApplicant() {
         setMessage("");
 
         try {
-            // 招待メールを送信
-            const { error: emailError } = await supabase.functions.invoke('send-invitation-email', {
-                body: {
-                    email: email,
-                    companyId: user?.id
+            // OTPを使用して招待メールを送信
+            const { error } = await supabase.auth.signInWithOtp({
+                email: email,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/register`,
+                    data: {
+                        invited_by_company_id: user?.id,
+                    }
                 }
             });
 
-            if (emailError) throw emailError;
+            if (error) throw error;
 
             setMessage("招待メールを送信しました");
             setInvitedEmails(prev => [...prev, email]);
             setEmail("");
         } catch (error) {
-            console.error('Error sending invitation email:', error);
+            console.error('Error inviting user:', error);
             setMessage("招待メールの送信に失敗しました");
         } finally {
             setLoading(false);

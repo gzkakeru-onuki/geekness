@@ -139,6 +139,7 @@ export default function ExamPage() {
             }
             window.confirm("解答を送信しますか？");
             alert("採点します...");
+
             // GeminiAPIを呼び出して採点
             const response = await fetch('/api/gemini', {
                 method: 'POST',
@@ -151,14 +152,36 @@ export default function ExamPage() {
                     ${question}
                     
                     採点基準:
-                    - コードの正確性
-                    - 実装の効率性
-                    - コードの可読性
+                    1. コード品質（20点）
+                       - コードの一貫性
+                       - ベストプラクティスの適用
                     
-                    100点満点で厳密に解答欄を確認して点数をつけてください。
-                    解答欄が空白の場合は、その問題は0点としてください。
-                    解答欄には答えは入れないでください。
-                    返答は数字のみで、合計点を返答してください。
+                    2. 保守性（20点）
+                       - コードの構造化
+                       - 将来の変更のしやすさ
+                    
+                    3. アルゴリズム（20点）
+                       - 問題解決の適切性
+                       - ロジックの正確性
+                    
+                    4. 可読性（20点）
+                       - 命名規則の適切さ
+                       - コメントの質と量
+                    
+                    5. パフォーマンス（20点）
+                       - 実行効率
+                       - リソース使用の最適化
+                    
+                    以下の形式でJSONで返答してください：
+                    {
+                        "code_quality": 数値,
+                        "maintainability": 数値,
+                        "algorithm": 数値,
+                        "readability": 数値,
+                        "performance": 数値,
+                        "total_score": 数値,
+                        "review_comments": "レビューコメント"
+                    }
                     `
                 })
             });
@@ -168,13 +191,14 @@ export default function ExamPage() {
             }
 
             const scoringResult = await response.json();
-            console.log(scoringResult);
-            if (!scoringResult.success) {
-                throw new Error('採点結果の取得に失敗しました');
-            }
+            console.log('API Response:', scoringResult);
+
+            // APIレスポンスから実際のJSONデータを抽出してパース
+            const jsonStr = scoringResult.data.match(/```json\n([\s\S]*)\n```/)[1];
+            const scores = JSON.parse(jsonStr);
+            console.log('Parsed Scores:', scores);
 
             const { data: { user }, error: userError } = await supabase.auth.getUser();
-
             if (userError) {
                 console.error("Error fetching user:", userError);
                 alert("ユーザー情報の取得に失敗しました。");
@@ -200,17 +224,25 @@ export default function ExamPage() {
                 return;
             }
 
-            // test_responseテーブルに解答を登録
+            // test_responseテーブルに詳細な採点結果を登録
             const { data, error } = await supabase
                 .from('test_responses')
                 .insert({
                     id: crypto.randomUUID(),
                     test_id: testId,
-                    applicant_id: testApplicant.id,  // test_applicantsテーブルのidを使用
+                    applicant_id: testApplicant.id,
                     answer: question,
-                    score: scoringResult.data,
+                    score: scores.total_score,
+                    code_quality_score: scores.code_quality,
+                    maintainability_score: scores.maintainability,
+                    algorithm_score: scores.algorithm,
+                    readability_score: scores.readability,
+                    performance_score: scores.performance,
+                    review_comments: scores.review_comments,
                     created_at: new Date().toISOString()
                 });
+
+            console.log('Supabase Insert Result:', { data, error });
 
             if (error) {
                 console.error("Error submitting response:", error);
@@ -218,9 +250,6 @@ export default function ExamPage() {
                 return;
             }
             alert("採点完了しました!");
-
-
-            // 送信後に解答フォームをクリア            
 
         } catch (error) {
             console.error("Error in handleSubmit:", error);

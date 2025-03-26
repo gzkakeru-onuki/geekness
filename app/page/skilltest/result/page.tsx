@@ -28,6 +28,17 @@ ChartJS.register(
     Legend
 );
 
+interface TestResponse {
+    answer: string;
+    score: number;
+    code_quality_score: number;
+    maintainability_score: number;
+    algorithm_score: number;
+    readability_score: number;
+    performance_score: number;
+    review_comments: string;
+}
+
 function SkillTestResultContent() {
     const [userCode, setUserCode] = useState("// あなたのコードがここに表示されます");
     const [userType, setUserType] = useState<"applicant" | "recruiter">("applicant");
@@ -38,6 +49,7 @@ function SkillTestResultContent() {
     const [applicants, setApplicants] = useState<Array<{ id: string, name: string }>>([]);
     const [selectedApplicantId, setSelectedApplicantId] = useState<string>("");
     const [activeTab, setActiveTab] = useState<'test' | 'interview'>('test');
+    const [testResponse, setTestResponse] = useState<TestResponse | null>(null);
 
     useEffect(() => {
         fetchUserData();
@@ -111,7 +123,6 @@ function SkillTestResultContent() {
 
     const fetchApplicantData = async (applicantId: string) => {
         try {
-            // test_applicantsからtest_idを取得
             const { data: testData } = await supabase
                 .from('test_applicants')
                 .select('test_id')
@@ -121,10 +132,18 @@ function SkillTestResultContent() {
                 .single();
 
             if (testData) {
-                // test_responsesから解答とスコアを取得
                 const { data: responseData } = await supabase
                     .from('test_responses')
-                    .select('answer,score')
+                    .select(`
+                        answer,
+                        score,
+                        code_quality_score,
+                        maintainability_score,
+                        algorithm_score,
+                        readability_score,
+                        performance_score,
+                        review_comments
+                    `)
                     .eq('test_id', testData.test_id)
                     .order('created_at', { ascending: false })
                     .limit(1)
@@ -133,9 +152,13 @@ function SkillTestResultContent() {
                 if (responseData) {
                     setUserCode(responseData.answer || "// コードが見つかりません");
                     setScore(responseData.score || 0);
+                    setReview(responseData.review_comments || "レビューコメントはありません");
+                    setTestResponse(responseData);
                 } else {
                     setUserCode("// 解答データが見つかりません");
                     setScore(0);
+                    setReview("");
+                    setTestResponse(null);
                 }
             }
         } catch (error) {
@@ -143,13 +166,19 @@ function SkillTestResultContent() {
         }
     };
 
-    // レーダーチャートのデータ
+    // レーダーチャートのデータを動的に更新
     const testData = {
-        labels: ['コード品質', 'アルゴリズム', '可読性', 'パフォーマンス', '保守性'],
+        labels: ['コード品質', '保守性', 'アルゴリズム', '可読性', 'パフォーマンス'],
         datasets: [
             {
                 label: 'スキル評価',
-                data: [80, 65, 90, 75, 85],
+                data: testResponse ? [
+                    testResponse.code_quality_score,
+                    testResponse.maintainability_score,
+                    testResponse.algorithm_score,
+                    testResponse.readability_score,
+                    testResponse.performance_score,
+                ] : [0, 0, 0, 0, 0],
                 backgroundColor: 'rgba(99, 102, 241, 0.2)',
                 borderColor: 'rgb(99, 102, 241)',
                 borderWidth: 2,
@@ -170,14 +199,14 @@ function SkillTestResultContent() {
         ],
     };
 
-    // オプション設定
+    // オプション設定の修正（20点満点に合わせる）
     const options = {
         scales: {
             r: {
                 beginAtZero: true,
-                max: 100,
+                max: 20, // 20点満点に変更
                 ticks: {
-                    stepSize: 20,
+                    stepSize: 4, // 5段階で表示
                 },
                 grid: {
                     color: 'rgba(0, 0, 0, 0.1)',
@@ -318,6 +347,33 @@ function SkillTestResultContent() {
                                         data={activeTab === 'test' ? testData : interviewData}
                                         options={options}
                                     />
+                                </div>
+                            </div>
+
+                            {/* スキル評価の詳細スコア表示を追加 */}
+                            <div className="bg-white rounded-xl p-4 border border-gray-100">
+                                <h3 className="text-sm font-medium text-gray-500 mb-2">詳細スコア</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-sm text-gray-600">コード品質:</p>
+                                        <p className="font-semibold">{testResponse?.code_quality_score || 0}/20</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">保守性:</p>
+                                        <p className="font-semibold">{testResponse?.maintainability_score || 0}/20</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">アルゴリズム:</p>
+                                        <p className="font-semibold">{testResponse?.algorithm_score || 0}/20</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">可読性:</p>
+                                        <p className="font-semibold">{testResponse?.readability_score || 0}/20</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">パフォーマンス:</p>
+                                        <p className="font-semibold">{testResponse?.performance_score || 0}/20</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
