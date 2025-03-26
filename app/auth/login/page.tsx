@@ -15,84 +15,175 @@ export default function Login() {
 
     const handleLogin = async (e: FormEvent, userType: string) => {
         e.preventDefault();
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
-        if (error) {
-            console.error(error);
-        } else {
+        try {
+            // まずAuthでログイン
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
 
-            console.log("login success");
-            console.log(data.user?.id, data.user?.email);
-            if (userType === "applicant") {
-                router.push("/page/dashboard?type=applicant");
-            } else {
-                router.push("/page/dashboard?type=recruiter");
+            if (error) {
+                console.error("Login error:", error);
+                alert("送信されたメールを確認していないか、メールアドレスかパスワードが間違っています。");
+                return;
             }
+
+            if (!data.user) {
+                alert("ユーザー情報の取得に失敗しました");
+                return;
+            }
+
+            // applicant_profilesをチェック
+            const { data: applicantProfile } = await supabase
+                .from('applicant_profiles')
+                .select('id')
+                .eq('id', data.user.id)
+                .maybeSingle();
+
+            // recruiter_profilesをチェック
+            const { data: recruiterProfile } = await supabase
+                .from('recruiter_profiles')
+                .select('id')
+                .eq('id', data.user.id)
+                .maybeSingle();
+
+            // プロフィールの存在確認と適切な遷移
+            if (applicantProfile) {
+                if (userType === "applicant") {
+                    router.push("/page/dashboard?type=applicant");
+                } else {
+                    alert("このアカウントは採用希望者として登録されています。採用希望者タブからログインしてください。");
+                    await supabase.auth.signOut();
+                }
+            } else if (recruiterProfile) {
+                if (userType === "recruiter") {
+                    router.push("/page/dashboard?type=recruiter");
+                } else {
+                    alert("このアカウントは企業担当者として登録されています。企業担当者タブからログインしてください。");
+                    await supabase.auth.signOut();
+                }
+            } else {
+                alert("プロフィール情報が見つかりません");
+                await supabase.auth.signOut();
+            }
+
+        } catch (error) {
+            console.error("Login process error:", error);
+            alert("ログイン処理中にエラーが発生しました");
         }
-    }
+    };
     return (
-        <div className="container mx-auto px-6 py-12">
-            <h1 className="text-4xl font-extrabold text-center mb-8 text-gray-800">ログイン画面</h1>
-            <div className="flex justify-center mb-8">
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-md mx-auto">
+                <div className="text-center mb-12">
+                    <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-4">
+                        Geekness
+                    </h1>
+                    <p className="text-gray-600 text-lg">アカウントにログイン</p>
+                </div>
 
-                <button
-                    className={`px-6 py-3 mx-2 rounded-full transition-colors duration-300 ${activeTab === "user" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-800"
-                        }`}
-                    onClick={() => setActiveTab("user")}
-                >
-                    <PersonIcon className="mr-2" />採用希望者
-                </button>
-                <button
-                    className={`px-6 py-3 mx-2 rounded-full transition-colors duration-300 ${activeTab === "company" ? "bg-green-600 text-white" : "bg-gray-200 text-gray-800"
-                        }`}
-                    onClick={() => setActiveTab("company")}
-                >
-                    <BusinessIcon className="mr-2" />企業担当者
-                </button>
-            </div>
-
-            <div className="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-lg">
-                {activeTab === "user" && (
-                    <form onSubmit={(e) => handleLogin(e, "applicant")}>
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-semibold mb-2">メールアドレス</label>
-                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-semibold mb-2">パスワード</label>
-                            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                        <button type="submit" value="applicant" className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-300 justify-center mx-auto">
-                            <LoginIcon className="mr-2" />ログイン
+                <div className="bg-white rounded-2xl shadow-xl p-8 backdrop-blur-sm bg-white/80">
+                    <div className="flex justify-center mb-8 space-x-4">
+                        <button
+                            className={`px-6 py-3 rounded-full transition-all duration-300 flex items-center ${activeTab === "user"
+                                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                            onClick={() => setActiveTab("user")}
+                        >
+                            <PersonIcon className="mr-2" />採用希望者
                         </button>
-                        <Link href="/auth/signup">
-                            <p className="text-center text-gray-700 font-semibold mt-2 hover:text-blue-600">新規登録はこちら</p>
-                        </Link>
-                    </form>
-                )}
-
-                {activeTab === "company" && (
-                    <form onSubmit={(e) => handleLogin(e, "recruiter")}>
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-semibold mb-2">メールアドレス</label>
-                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-semibold mb-2">パスワード</label>
-                            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-
-                        <button value="recruiter" type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-300">
-                            ログイン
+                        <button
+                            className={`px-6 py-3 rounded-full transition-all duration-300 flex items-center ${activeTab === "company"
+                                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                            onClick={() => setActiveTab("company")}
+                        >
+                            <BusinessIcon className="mr-2" />企業担当者
                         </button>
+                    </div>
 
-                        <Link href="/auth/signup">
-                            <p className="text-center text-gray-700 font-semibold mt-2 hover:text-blue-600">新規登録はこちら</p>
-                        </Link>
-                    </form>
-                )}
+                    {activeTab === "user" && (
+                        <form onSubmit={(e) => handleLogin(e, "applicant")} className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    メールアドレス
+                                </label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+                                    placeholder="example@email.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    パスワード
+                                </label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300 flex items-center justify-center"
+                            >
+                                <LoginIcon className="mr-2" />ログイン
+                            </button>
+                            <Link href="/auth/signup" className="block text-center">
+                                <p className="text-indigo-600 hover:text-indigo-700 font-medium transition-colors duration-200">
+                                    新規登録はこちら
+                                </p>
+                            </Link>
+                        </form>
+                    )}
+
+                    {activeTab === "company" && (
+                        <form onSubmit={(e) => handleLogin(e, "recruiter")} className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    メールアドレス
+                                </label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+                                    placeholder="example@email.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    パスワード
+                                </label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300 flex items-center justify-center"
+                            >
+                                <LoginIcon className="mr-2" />ログイン
+                            </button>
+                            <Link href="/auth/signup" className="block text-center">
+                                <p className="text-indigo-600 hover:text-indigo-700 font-medium transition-colors duration-200">
+                                    新規登録はこちら
+                                </p>
+                            </Link>
+                        </form>
+                    )}
+                </div>
             </div>
         </div>
     );

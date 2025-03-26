@@ -2,28 +2,28 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/utils/supabase";
 import {
-    UserGroupIcon,
+    BriefcaseIcon,
     DocumentTextIcon,
     CalendarIcon,
     ChartBarIcon,
     BuildingOfficeIcon,
-    ArrowTrendingUpIcon,
     CheckCircleIcon,
-    ClockIcon
+    ClockIcon,
+    UserIcon
 } from '@heroicons/react/24/outline';
 
-export default function RecruiterDashboard() {
+export default function ApplicantDashboard() {
     const [stats, setStats] = useState({
-        totalApplicants: 0,
-        pendingReviews: 0,
+        totalApplications: 0,
+        pendingResponses: 0,
         upcomingInterviews: 0,
         averageScore: 0
     });
 
-    const [recentApplicants, setRecentApplicants] = useState([
+    const [recentApplications, setRecentApplications] = useState([
         {
             id: 1,
-            name: "田中太郎",
+            company: "株式会社テクノロジー",
             position: "シニアエンジニア",
             status: "選考中",
             appliedDate: "2024-03-15",
@@ -31,7 +31,7 @@ export default function RecruiterDashboard() {
         },
         {
             id: 2,
-            name: "山田花子",
+            company: "株式会社イノベーション",
             position: "フロントエンドエンジニア",
             status: "書類選考",
             appliedDate: "2024-03-14",
@@ -45,10 +45,10 @@ export default function RecruiterDashboard() {
             <header className="bg-white/90 backdrop-blur-lg shadow-lg p-6">
                 <div className="max-w-7xl mx-auto">
                     <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-                        採用担当者ダッシュボード
+                        応募者ダッシュボード
                     </h1>
                     <div className="mt-2 text-sm text-gray-600">
-                        応募者の状況を確認・管理できます
+                        あなたの応募状況を確認できます
                     </div>
                 </div>
             </header>
@@ -60,11 +60,11 @@ export default function RecruiterDashboard() {
                     <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-gray-600">総応募者数</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalApplicants}</p>
+                                <p className="text-sm font-medium text-gray-600">応募企業数</p>
+                                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalApplications}</p>
                             </div>
                             <div className="bg-indigo-100 p-3 rounded-full">
-                                <UserGroupIcon className="w-6 h-6 text-indigo-600" />
+                                <BriefcaseIcon className="w-6 h-6 text-indigo-600" />
                             </div>
                         </div>
                     </div>
@@ -72,11 +72,11 @@ export default function RecruiterDashboard() {
                     <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-gray-600">未レビュー数</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.pendingReviews}</p>
+                                <p className="text-sm font-medium text-gray-600">未返信数</p>
+                                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.pendingResponses}</p>
                             </div>
                             <div className="bg-purple-100 p-3 rounded-full">
-                                <DocumentTextIcon className="w-6 h-6 text-purple-600" />
+                                <ClockIcon className="w-6 h-6 text-purple-600" />
                             </div>
                         </div>
                     </div>
@@ -106,21 +106,21 @@ export default function RecruiterDashboard() {
                     </div>
                 </div>
 
-                {/* 最近の応募者 */}
+                {/* 最近の応募状況 */}
                 <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold text-gray-800">最近の応募者</h2>
+                        <h2 className="text-xl font-bold text-gray-800">最近の応募状況</h2>
                         <a
-                            href="/applicants"
+                            href="/applications"
                             className="text-indigo-600 hover:text-indigo-700 text-sm font-medium"
                         >
                             すべて表示 →
                         </a>
                     </div>
                     <div className="space-y-4">
-                        {recentApplicants.map((applicant) => (
+                        {recentApplications.map((application) => (
                             <div
-                                key={applicant.id}
+                                key={application.id}
                                 className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 hover:shadow-lg transition-shadow duration-200"
                             >
                                 <div className="flex items-center justify-between">
@@ -129,24 +129,24 @@ export default function RecruiterDashboard() {
                                             <BuildingOfficeIcon className="w-6 h-6 text-indigo-600" />
                                         </div>
                                         <div>
-                                            <h3 className="font-semibold text-gray-800">{applicant.name}</h3>
-                                            <p className="text-sm text-gray-600">{applicant.position}</p>
+                                            <h3 className="font-semibold text-gray-800">{application.company}</h3>
+                                            <p className="text-sm text-gray-600">{application.position}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center space-x-4">
                                         <div className="text-right">
                                             <p className="text-sm text-gray-600">応募日</p>
-                                            <p className="font-medium text-gray-800">{applicant.appliedDate}</p>
+                                            <p className="font-medium text-gray-800">{application.appliedDate}</p>
                                         </div>
-                                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${applicant.status === "選考中"
+                                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${application.status === "選考中"
                                                 ? 'bg-blue-100 text-blue-800'
                                                 : 'bg-gray-100 text-gray-800'
                                             }`}>
-                                            {applicant.status}
+                                            {application.status}
                                         </div>
                                         <div className="text-right">
                                             <p className="text-sm text-gray-600">スコア</p>
-                                            <p className="font-medium text-gray-800">{applicant.score}</p>
+                                            <p className="font-medium text-gray-800">{application.score}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -163,10 +163,10 @@ export default function RecruiterDashboard() {
                     </button>
                     <button className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200">
                         <DocumentTextIcon className="w-5 h-5" />
-                        <span>新規求人作成</span>
+                        <span>プロフィール編集</span>
                     </button>
                 </div>
             </main>
         </div>
     );
-}
+} 

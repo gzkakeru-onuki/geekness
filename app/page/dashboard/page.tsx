@@ -1,138 +1,219 @@
 "use client";
-import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import LogoutIcon from '@mui/icons-material/Logout';
-import SettingsIcon from '@mui/icons-material/Settings';
-import PersonIcon from '@mui/icons-material/Person';
-import HomeIcon from '@mui/icons-material/Home';
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/utils/supabase";
+import Link from "next/link";
+import PersonIcon from '@mui/icons-material/Person';
+import SettingsIcon from '@mui/icons-material/Settings';
+import LogoutIcon from '@mui/icons-material/Logout';
+import { useAuth } from "@/app/contexts/AuthContext";
+import {
+    UserGroupIcon,
+    DocumentTextIcon,
+    CalendarIcon,
+    ChartBarIcon,
+    BuildingOfficeIcon,
+    ArrowTrendingUpIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    EnvelopeIcon
+} from '@heroicons/react/24/outline';
 
-function DashboardContent() {
-    const searchParams = useSearchParams();
-    const [userType, setUserType] = useState<"applicant" | "recruiter">("applicant");
+export default function Dashboard() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const { user, signOut } = useAuth();
+    const [userType, setUserType] = useState<string | null>(null);
+    const [userData, setUserData] = useState<any>(null);
 
     useEffect(() => {
-        // URLパラメータからユーザー種別を取得
-        const type = searchParams?.get("type");
-        if (type === "recruiter") {
-            setUserType("recruiter");
-        } else {
-            setUserType("applicant");
-        }
-    }, [searchParams]);
+        const type = searchParams.get("type");
+        setUserType(type);
 
-    const handleLogout = async () => {        
-        // 本当にログアウトするか確認
-        const confirmLogout = window.confirm("本当にログアウトしますか？");
-        if (confirmLogout) {
-            // ログアウト処理を実行
-            console.log("ログアウトします");
-            const { error } = await supabase.auth.signOut();
-            if (error) {
-                console.error(error);
-            }else {
-                console.log("logout success");
+        const fetchUserData = async () => {
+            if (!user) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from(type === "applicant" ? "applicant_profiles" : "recruiter_profiles")
+                    .select("*")
+                    .eq("id", user.id)
+                    .single();
+
+                if (error) throw error;
+                setUserData(data);
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+            }
+        };
+
+        fetchUserData();
+    }, [user, searchParams]);
+
+    const handleSignOut = async () => {
+        try {
+            const confirmed = confirm("ログアウトしますか？");
+            if (confirmed) {
+                await signOut();
                 router.push("/");
             }
+        } catch (error) {
+            console.error("Error signing out:", error);
         }
     };
 
-    return (
-        <div className="flex h-screen">
-            <div className={`fixed top-0 left-0 h-full bg-gray-800 text-white transition-transform transform md:relative md:translate-x-0 md:w-64`}>
-                <nav className="p-6">
-                    <ul className="space-y-4">
-                        <li>
-                            <a href="/" className="flex items-center py-2 px-4 rounded hover:bg-gray-700">
-                                <HomeIcon className="mr-2" />Home
-                            </a>
-                        </li>
-                        <li>
-                            <Link href="/page/dashboard/profile" className="flex items-center py-2 px-4 rounded hover:bg-gray-700">
-                                <PersonIcon className="mr-2" />Profile
-                            </Link>
-                        </li>
-                        <li>
-                            <Link href="/page/dashboard/settings" className="flex items-center py-2 px-4 rounded hover:bg-gray-700">
-                                <SettingsIcon className="mr-2" />Settings
-                            </Link>
-                        </li>
-                        <li>
-                            <button
-                                onClick={handleLogout}
-                                className="flex items-center w-full text-left py-2 px-4 rounded hover:bg-gray-700"
-                            >
-                                <LogoutIcon className="mr-2" />Logout
-                            </button>                            
-                        </li>
-                    </ul>
-                </nav>
-            </div>
-
-            {/* メインコンテンツ */}
-            <div className="flex-1 bg-gradient-to-r from-blue-50 to-blue-100 p-8 ml-0">
-                {/* パンくずリスト */}
-                <div className="mb-4 text-gray-600">
-                    <Link href="/"><span className="text-blue-600">ホーム</span></Link> &gt; <span className="text-blue-600">{userType === "applicant" ? "応募者ダッシュボード" : "採用担当者ダッシュボード"}</span>
+    if (!userType) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+                <div className="text-center">
+                    <h1 className="text-2xl font-bold text-gray-800 mb-4">ユーザータイプが指定されていません</h1>
+                    <Link href="/" className="text-indigo-600 hover:text-indigo-700">
+                        ホームに戻る
+                    </Link>
                 </div>
+            </div>
+        );
+    }
 
-                <h1 className="text-4xl font-extrabold text-center mb-8 text-gray-800">ダッシュボード</h1>
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="bg-white rounded-2xl shadow-xl p-6 backdrop-blur-sm bg-white/80">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <Link href="/">
+                                <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+                                    Geekness
+                                </h1>
+                            </Link>
+                            <p className="text-gray-600 mt-1">
+                                {userType === "applicant" ? "採用希望者" : "企業担当者"}ダッシュボード
+                            </p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <Link
+                                href={`/page/dashboard/profile`}
+                                className="flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300"
+                            >
+                                <PersonIcon className="mr-2" />
+                                プロフィール
+                            </Link>
+                            <Link
+                                href="/page/dashboard/settings"
+                                className="flex items-center px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-300"
+                            >
+                                <SettingsIcon className="mr-2" />
+                                設定
+                            </Link>
+                            <button
+                                onClick={handleSignOut}
+                                className="flex items-center px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all duration-300"
+                            >
+                                <LogoutIcon className="mr-2" />
+                                ログアウト
+                            </button>
+                        </div>
+                    </div>
 
-                <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {userType === "applicant" && (
-                        <>
-                            <Link href="/page/dashboard/recruiter" className="block bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300">
-                                <h2 className="text-2xl font-bold mb-2 text-blue-800">応募中の求人一覧</h2>
-                                <p className="text-gray-700">現在応募中の求人を確認できます。</p>
-                            </Link>
-                            <Link href="/page/schedule" className="block bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300">
-                                <h2 className="text-2xl font-bold mb-2 text-blue-800">面接スケジュール</h2>
-                                <p className="text-gray-700">面接のスケジュールを確認できます。</p>
-                            </Link>
-                            <Link href="/page/skilltest/exam" className="block bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300">
-                                <h2 className="text-2xl font-bold mb-2 text-blue-800">テスト受験画面</h2>
-                                <p className="text-gray-700">テスト受験画面を表示できます。</p>
-                            </Link>
-                            <Link href="/page/skilltest/result?type=applicant" className="block bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300">
-                                <h2 className="text-2xl font-bold mb-2 text-blue-800">テスト結果画面</h2>
-                                <p className="text-gray-700">テスト結果画面を表示できます。</p>
-                            </Link>
-                        </>
-                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {userType === "applicant" ? (
+                            <>
+                                <Link href="/page/applicant" className="block">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 hover:shadow-lg transition-all duration-300">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">応募中の求人一覧</h2>
+                                        <p className="text-gray-600 mb-4">現在応募中の求人を確認できます。</p>
+                                        <div className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300">
+                                            求人を確認
+                                        </div>
+                                    </div>
+                                </Link>
 
-                    {userType === "recruiter" && (
-                        <>
-                            <Link href="/page/applicant" className="block bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300">
-                                <h2 className="text-2xl font-bold mb-2 text-green-800">応募者一覧</h2>
-                                <p className="text-gray-700">応募者の一覧を確認できます。</p>
-                            </Link>
-                            <Link href="/page/schedule" className="block bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300">
-                                <h2 className="text-2xl font-bold mb-2 text-green-800">面接スケジュール管理</h2>
-                                <p className="text-gray-700">面接のスケジュールを管理できます。</p>
-                            </Link>
-                            <Link href="/page/skilltest/create" className="block bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300">
-                                <h2 className="text-2xl font-bold mb-2 text-green-800">スキルテスト作成</h2>
-                                <p className="text-gray-700">スキルテストを作成できます。</p>
-                            </Link>
-                            <Link href="/page/skilltest/result?type=recruiter" className="block bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300">
-                                <h2 className="text-2xl font-bold mb-2 text-green-800">テスト結果画面</h2>
-                                <p className="text-gray-700">テスト結果画面を表示できます。</p>
-                            </Link>
-                        </>
-                    )}
+                                <Link href="/page/schedule" className="block">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 hover:shadow-lg transition-all duration-300">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">面接スケジュール</h2>
+                                        <p className="text-gray-600 mb-4">面接のスケジュールを確認できます。</p>
+                                        <div className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300">
+                                            スケジュールを確認
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/page/skilltest/exam" className="block">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 hover:shadow-lg transition-all duration-300">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">テスト受験画面</h2>
+                                        <p className="text-gray-600 mb-4">テスト受験画面を表示できます。</p>
+                                        <div className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300">
+                                            テストを受ける
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/page/skilltest/result?type=applicant" className="block">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 hover:shadow-lg transition-all duration-300">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">テスト結果画面</h2>
+                                        <p className="text-gray-600 mb-4">テスト結果画面を表示できます。</p>
+                                        <div className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300">
+                                            結果を確認
+                                        </div>
+                                    </div>
+                                </Link>
+                            </>
+                        ) : (
+                            <>
+                                <Link href="/page/dashboard/recruiter" className="block">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 hover:shadow-lg transition-all duration-300">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">応募者一覧</h2>
+                                        <p className="text-gray-600 mb-4">応募者の一覧を確認できます。</p>
+                                        <div className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300">
+                                            応募者を確認
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/page/dashboard/invite" className="block">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 hover:shadow-lg transition-all duration-300">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">受験者を招待</h2>
+                                        <p className="text-gray-600 mb-4">新規受験者に招待メールを送信できます。</p>
+                                        <div className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300">
+                                            招待メールを送信
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/page/schedule" className="block">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 hover:shadow-lg transition-all duration-300">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">面接スケジュール管理</h2>
+                                        <p className="text-gray-600 mb-4">面接のスケジュールを管理できます。</p>
+                                        <div className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300">
+                                            スケジュールを管理
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/page/skilltest/create" className="block">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 hover:shadow-lg transition-all duration-300">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">スキルテスト作成</h2>
+                                        <p className="text-gray-600 mb-4">スキルテストを作成できます。</p>
+                                        <div className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300">
+                                            テストを作成
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/page/skilltest/result?type=recruiter" className="block">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 hover:shadow-lg transition-all duration-300">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">テスト結果画面</h2>
+                                        <p className="text-gray-600 mb-4">テスト結果画面を表示できます。</p>
+                                        <div className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300">
+                                            結果を確認
+                                        </div>
+                                    </div>
+                                </Link>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
-    );
-}
-
-export default function Page() {
-    return (
-        <Suspense fallback={<div>Loading...</div>}>
-            <DashboardContent />
-        </Suspense>
     );
 }
