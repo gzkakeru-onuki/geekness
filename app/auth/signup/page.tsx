@@ -5,6 +5,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import BusinessIcon from '@mui/icons-material/Business';
 import { supabase } from "@/app/utils/supabase";
 import { useRouter } from "next/navigation";
+import { randomUUID } from "crypto";
 
 export default function Signup() {
     const router = useRouter();
@@ -115,10 +116,32 @@ export default function Signup() {
                 router.push("/page/dashboard?type=applicant");
 
             } else if (activeTab === "company") {
+                // 1. まず会社情報を登録
                 const { data: companyData, error: companyError } = await supabase
+                    .from('companies')
+                    .insert({
+                        id: crypto.randomUUID(),
+                        name: companyName,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    })
+                    .select()
+                    .single();
+
+                if (companyError) {
+                    console.error("Company creation error:", companyError);
+                    // 会社登録に失敗した場合、作成したユーザーを削除
+                    await supabase.auth.admin.deleteUser(data.user.id);
+                    alert("会社情報の登録に失敗しました");
+                    return;
+                }
+
+                // 2. 採用担当者のプロフィールを作成（company_idを含める）
+                const { data: recruiterData, error: recruiterError } = await supabase
                     .from('recruiter_profiles')
                     .insert({
                         id: data.user?.id,
+                        company_id: companyData.id, // 作成した会社のIDを設定
                         company_name: companyName,
                         recruiter_firstname: representativeFirstName,
                         recruiter_lastname: representativeLastName,
@@ -136,15 +159,16 @@ export default function Signup() {
                         updated_at: new Date().toISOString()
                     });
 
-                if (companyError) {
-                    console.error("Insert profile error:", companyError);
-                    // プロフィール登録に失敗した場合、作成したユーザーを削除
+                if (recruiterError) {
+                    console.error("Insert profile error:", recruiterError);
+                    // プロフィール登録に失敗した場合、作成した会社とユーザーを削除
+                    await supabase.from('companies').delete().eq('id', companyData.id);
                     await supabase.auth.admin.deleteUser(data.user.id);
                     alert("プロフィールの登録に失敗しました");
                     return;
                 }
 
-                console.log("Profile inserted successfully");
+                console.log("Company and Profile inserted successfully");
                 router.push("/page/dashboard?type=recruiter");
             }
 

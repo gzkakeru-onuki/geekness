@@ -20,24 +20,113 @@ export default function RecruiterDashboard() {
         averageScore: 0
     });
 
-    const [recentApplicants, setRecentApplicants] = useState([
-        {
-            id: 1,
-            name: "田中太郎",
-            position: "シニアエンジニア",
-            status: "選考中",
-            appliedDate: "2024-03-15",
-            score: 85
-        },
-        {
-            id: 2,
-            name: "山田花子",
-            position: "フロントエンドエンジニア",
-            status: "書類選考",
-            appliedDate: "2024-03-14",
-            score: 92
-        }
-    ]);
+    const [recentApplicants, setRecentApplicants] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            // ログイン中のユーザー情報を取得
+            const { data: { user } } = await supabase.auth.getUser();
+            console.log('1. ログインユーザー情報:', user);
+            if (!user) {
+                console.log('ログインユーザーが見つかりません');
+                return;
+            }
+
+            // まず、ユーザーIDに紐づく recruiter_profile を取得
+            const { data: recruiterProfile, error: recruiterError } = await supabase
+                .from('recruiter_profiles')
+                .select('company_id')
+                .eq('id', user.id)
+                .single();
+
+            console.log('2. Recruiter Profile取得結果:', { recruiterProfile, error: recruiterError });
+
+            if (recruiterError) {
+                console.log('Recruiter Profile取得エラー:', recruiterError);
+                return;
+            }
+            if (!recruiterProfile) {
+                console.log('Recruiter Profileが見つかりません');
+                return;
+            }
+
+            // 総応募者数を取得
+            const { count: totalApplicants, error: applicantsError } = await supabase
+                .from('applications')
+                .select('*', { count: 'exact' })
+                .eq('company_id', recruiterProfile.company_id);
+
+            console.log('3. 総応募者数取得結果:', { totalApplicants, error: applicantsError });
+
+            // 最近の応募者リストを取得
+            const { data: applicants, error: recentError } = await supabase
+                .from('applications')
+                .select(`
+                    id,
+                    applied_at,
+                    status,
+                    applicant_id (
+                        id,
+                        applicant_firstname,
+                        applicant_lastname,
+                        test_responses (
+                            score
+                        )
+                    )
+                `)
+                .eq('company_id', recruiterProfile.company_id)
+                .order('applied_at', { ascending: false })
+                .limit(10);
+
+            console.log('4. 応募者リスト取得結果:', {
+                applicants,
+                error: recentError
+            });
+
+            // 応募者リストを整形して設定
+            const formattedApplicants = applicants?.map(app => {
+                console.log('個別の応募データ:', app);
+
+                const lastname = app?.applicant_id?.applicant_lastname || '';
+                const firstname = app?.applicant_id?.applicant_firstname || '';
+
+                // test_responsesからスコアを取得（複数ある場合は平均値を計算）
+                const scores = app?.applicant_id?.test_responses?.map(tr => tr.score) || [];
+                const averageScore = scores.length > 0
+                    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+                    : 0;
+
+                return {
+                    id: app.id,
+                    name: lastname && firstname ? `${lastname} ${firstname}` : '応募者',
+                    position: "応募者",
+                    status: app.status || '書類選考',
+                    appliedDate: new Date(app.applied_at).toLocaleDateString('ja-JP'),
+                    score: averageScore
+                };
+            }) || [];
+
+            // 全体の平均スコアを計算
+            const totalScore = formattedApplicants.reduce((sum, applicant) => sum + applicant.score, 0);
+            const applicantsWithScore = formattedApplicants.filter(app => app.score > 0).length;
+            const overallAverageScore = applicantsWithScore > 0
+                ? Math.round(totalScore / applicantsWithScore)
+                : 0;
+
+            console.log('整形後のデータ:', formattedApplicants);
+
+            // 状態を更新
+            setStats(prev => ({
+                ...prev,
+                totalApplicants: totalApplicants || 0,
+                averageScore: overallAverageScore
+            }));
+
+            setRecentApplicants(formattedApplicants);
+        };
+
+        fetchData();
+    }, []);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
@@ -139,8 +228,8 @@ export default function RecruiterDashboard() {
                                             <p className="font-medium text-gray-800">{applicant.appliedDate}</p>
                                         </div>
                                         <div className={`px-3 py-1 rounded-full text-sm font-medium ${applicant.status === "選考中"
-                                                ? 'bg-blue-100 text-blue-800'
-                                                : 'bg-gray-100 text-gray-800'
+                                            ? 'bg-blue-100 text-blue-800'
+                                            : 'bg-gray-100 text-gray-800'
                                             }`}>
                                             {applicant.status}
                                         </div>

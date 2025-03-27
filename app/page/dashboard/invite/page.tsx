@@ -24,25 +24,58 @@ export default function InviteApplicant() {
         setMessage("");
 
         try {
-            // OTPを使用して招待メールを送信
-            const { error } = await supabase.auth.signInWithOtp({
-                email: email,
-                options: {
-                    emailRedirectTo: `${window.location.origin}/auth/register`,
-                    data: {
-                        invited_by_company_id: user?.id,
-                    }
-                }
+            // 採用担当者の企業IDを取得
+            const { data: recruiterData, error: recruiterError } = await supabase
+                .from('recruiter_profiles')
+                .select('company_id')
+                .eq('id', user?.id)
+                .maybeSingle();
+
+            if (recruiterError || !recruiterData?.company_id) {
+                throw new Error("企業情報の取得に失敗しました");
+            }
+
+            // 招待レコードを作成
+            const { data: invitation, error: invitationError } = await supabase
+                .from('invitations')
+                .insert({
+                    email: email,
+                    company_id: recruiterData.company_id,
+                    status: 'pending'
+                })
+                .select()
+                .single();
+
+            if (invitationError) throw invitationError;
+
+            // 招待メールを送信
+            const response = await fetch('/api/send-invitation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email,
+                    invitationId: invitation.id,
+                    companyId: recruiterData.company_id
+                }),
             });
 
-            if (error) throw error;
+            if (!response.ok) {
+                throw new Error('メール送信に失敗しました');
+            }
 
             setMessage("招待メールを送信しました");
             setInvitedEmails(prev => [...prev, email]);
             setEmail("");
+
         } catch (error) {
             console.error('Error inviting user:', error);
-            setMessage("招待メールの送信に失敗しました");
+            if (error instanceof Error) {
+                setMessage(error.message);
+            } else {
+                setMessage("招待メールの送信に失敗しました");
+            }
         } finally {
             setLoading(false);
         }

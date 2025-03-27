@@ -15,13 +15,16 @@ import {
     CheckBadgeIcon
 } from '@heroicons/react/24/outline';
 import Link from "next/link";
+
 export default function ApplicantPage() {
     const [profile, setProfile] = useState({
-        name: "山田太郎",
-        title: "シニアエンジニア",
-        experience: "8年",
-        skills: ["React", "TypeScript", "Node.js", "AWS"],
-        rating: 4.8
+        name: "",
+        title: "",
+        experience: "",
+        skills: [],
+        rating: 4.8,
+        company: "",
+        position: ""
     });
 
     const [applications, setApplications] = useState([
@@ -48,6 +51,66 @@ export default function ApplicantPage() {
             tags: ["Node.js", "TypeScript", "GCP"]
         }
     ]);
+
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            // ログインユーザーの取得
+            const { data: { user } } = await supabase.auth.getUser();
+            console.log('ログインユーザー:', user);
+            if (!user) return;
+
+            // applicant_profilesからユーザー情報を取得
+            const { data: applicantProfile, error: profileError } = await supabase
+                .from('applicant_profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            console.log('取得したプロフィール:', applicantProfile);
+
+            if (profileError) {
+                console.error('プロフィール取得エラー:', profileError);
+                return;
+            }
+
+            if (applicantProfile) {
+                // 各JSONデータをパース
+                const skillsData = JSON.parse(applicantProfile.applicant_skills || '[]');
+                const experienceData = JSON.parse(applicantProfile.applicant_experience || '[]');
+                const certifications = JSON.parse(applicantProfile.applicant_certifications || '[]');
+
+                // 最新の職歴を取得（isCurrentlyがtrueまたは最後の要素）
+                const currentExperience = experienceData.find(exp => exp.isCurrently) || experienceData[experienceData.length - 1] || {};
+
+                // スキル情報を整形
+                const formattedSkills = skillsData.map(skill => ({
+                    name: skill.name,
+                    level: skill.level,
+                    years: skill.years,
+                    levelText: {
+                        'beginner': '初級',
+                        'intermediate': '中級',
+                        'advanced': '上級',
+                        'expert': 'エキスパート'
+                    }[skill.level] || skill.level
+                }));
+
+                setProfile({
+                    name: `${applicantProfile.applicant_lastname} ${applicantProfile.applicant_firstname}`,
+                    title: Array.isArray(certifications) && certifications.length > 0
+                        ? certifications.join(', ')
+                        : '資格なし',
+                    experience: "経験者",
+                    skills: formattedSkills,
+                    rating: 4.8,
+                    company: currentExperience.company || '',
+                    position: currentExperience.position || ''
+                });
+            }
+        };
+
+        fetchUserProfile();
+    }, []);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
@@ -83,24 +146,37 @@ export default function ApplicantPage() {
                             <div>
                                 <h2 className="text-xl font-bold text-gray-800">{profile.name}</h2>
                                 <div className="flex items-center space-x-4 mt-1">
-                                    <span className="text-gray-600">{profile.title}</span>
-                                    <span className="text-gray-400">•</span>
-                                    <span className="text-gray-600">{profile.experience}の経験</span>
+                                    {profile.company && (
+                                        <>
+                                            <span className="text-gray-600 bg-gray-100 px-2 py-1 rounded-full"><></>{profile.company}</span>                                            
+                                        </>
+                                    )}
+                                    {profile.position && (
+                                        <>
+                                            <span className="text-gray-600 bg-gray-100 px-2 py-1 rounded-full">{profile.position}</span>                                            
+                                        </>
+                                    )}                                    
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        {/* <div className="flex items-center space-x-2">
                             <StarIcon className="w-5 h-5 text-yellow-400" />
                             <span className="text-lg font-bold text-gray-800">{profile.rating}</span>
-                        </div>
+                        </div> */}
                     </div>
                     <div className="mt-6 flex flex-wrap gap-2">
                         {profile.skills.map((skill, index) => (
                             <span
                                 key={index}
-                                className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium"
+                                className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium flex items-center gap-2"
                             >
-                                {skill}
+                                <span>{skill.name}</span>
+                                <span className="text-xs bg-indigo-200 px-2 py-0.5 rounded-full">
+                                    {skill.levelText}
+                                </span>
+                                <span className="text-xs text-indigo-600">
+                                    {skill.years}年
+                                </span>
                             </span>
                         ))}
                     </div>

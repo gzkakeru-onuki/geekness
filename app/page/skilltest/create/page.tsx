@@ -32,23 +32,64 @@ export default function SkillTestCreation() {
     // useEffectを追加して、コンポーネントのマウント時に応募者データを取得
     useEffect(() => {
         const fetchApplicants = async () => {
-            const { data, error } = await supabase
-                .from('applicant_profiles')
-                .select('id, applicant_lastname, applicant_firstname');
+            try {
+                // 現在ログインしているユーザー（企業）の情報を取得
+                const { data: { user } } = await supabase.auth.getUser();
+                console.log('ログイン中のユーザー:', user?.id);
+                if (!user) {
+                    console.error('ユーザー情報が取得できません');
+                    return;
+                }
 
-            if (error) {
-                console.error('応募者データの取得に失敗しました:', error);
-                return;
+                // 企業のIDを取得
+                const { data: recruiterData, error: recruiterError } = await supabase
+                    .from('recruiter_profiles')
+                    .select('company_id')
+                    .eq('id', user.id)
+                    .single();
+
+
+
+                if (recruiterError) {
+                    console.error('企業情報の取得に失敗しました:', recruiterError);
+                    return;
+                }
+
+                // applicationsテーブルから企業の応募者を取得
+                const { data: applications, error: applicationsError } = await supabase
+                    .from('applications')
+                    .select(`
+                        applicant_id,
+                        applicant_profiles (
+                            id,
+                            applicant_lastname,
+                            applicant_firstname
+                        )
+                    `)
+                    .eq('company_id', recruiterData.company_id)
+                    .eq('status', 'pending');
+
+                if (applicationsError) {
+                    console.error('応募者データの取得に失敗しました:', applicationsError);
+                    return;
+                }
+
+                // 応募者データを整形
+                const formattedApplicants = applications
+                    .filter(app => app.applicant_profiles) // nullチェック
+                    .map(app => ({
+                        id: app.applicant_id,
+                        name: `${app.applicant_profiles.applicant_lastname} ${app.applicant_profiles.applicant_firstname}`
+                    }));
+
+                setApplicants(formattedApplicants);
+            } catch (error) {
+                console.error('データの取得中にエラーが発生しました:', error);
             }
-
-            setApplicants(data.map((applicant) => ({
-                id: applicant.id,
-                name: `${applicant.applicant_lastname} ${applicant.applicant_firstname}`
-            })) || []);
         };
 
         fetchApplicants();
-    }, []);
+    }, [router]);
 
     const handleCreateTest = async () => {
         if (prompt.trim() === "") {
@@ -119,6 +160,18 @@ export default function SkillTestCreation() {
                 throw new Error('ユーザー情報が取得できません');
             }
 
+            // 企業のIDを取得
+            const { data: recruiterData, error: recruiterError } = await supabase
+                .from('recruiter_profiles')
+                .select('company_id')
+                .eq('id', user.id)
+                .single();
+
+            if (recruiterError) {
+                console.error('企業情報の取得に失敗しました:', recruiterError);
+                throw new Error('企業情報の取得に失敗しました');
+            }
+
             // スキルテストをDBに保存
             const { data: testData, error: testError } = await supabase
                 .from('skill_tests')
@@ -132,7 +185,7 @@ export default function SkillTestCreation() {
                     test_type: testType,
                     question_count: questionCount,
                     time_limit: timeLimit,
-                    company_id: user.id,
+                    company_id: recruiterData.company_id,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 })
