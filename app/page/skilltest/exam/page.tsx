@@ -7,8 +7,47 @@ import 'prismjs/components/prism-javascript';
 import 'prismjs/themes/prism.css';
 import { supabase } from "@/app/utils/supabase";
 
+// 型定義を追加
+interface SkillTest {
+    title: string;
+    programming_language: string;
+    difficulty: string;
+}
+
+interface TestApplicant {
+    id: string;
+    test_id: string;
+    skill_tests: SkillTest;
+    applicant_id?: string;
+    status?: 'pending' | 'completed' | 'cancelled';
+}
+
+type DatabaseTestApplicant = Omit<TestApplicant, 'skill_tests'> & {
+    skill_tests: {
+        title: string;
+        programming_language: string;
+        difficulty: string;
+    };
+};
+
+interface TestInfo {
+    title: string;
+    category: string;
+    programming_language: string;
+    experience_level: string;
+    difficulty: string;
+    test_type: string;
+    time_limit: number;
+}
+
+interface TestSelectionModalProps {
+    tests: TestApplicant[];
+    onSelect: (testId: string) => void;
+    onClose: () => void;
+}
+
 // テスト選択用のモーダルコンポーネントを追加
-const TestSelectionModal = ({ tests, onSelect, onClose }) => {
+const TestSelectionModal = ({ tests, onSelect, onClose }: TestSelectionModalProps) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4">
@@ -54,11 +93,11 @@ export default function ExamPage() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [question, setQuestion] = useState("");
-    const [testId, setTestId] = useState(null);
+    const [testId, setTestId] = useState<string | null>(null);
     const [timeLeft, setTimeLeft] = useState(3600); // 60分 = 3600秒
     const [isStarted, setIsStarted] = useState(false); // テスト開始状態
     const [isEditorDisabled, setIsEditorDisabled] = useState(true); // エディタの編集可否
-    const [testInfo, setTestInfo] = useState({
+    const [testInfo, setTestInfo] = useState<TestInfo>({
         title: "",
         category: "",
         programming_language: "",
@@ -67,7 +106,7 @@ export default function ExamPage() {
         test_type: "",
         time_limit: 0
     });
-    const [availableTests, setAvailableTests] = useState<Array<{ id: string, test_id: string }>>([]);
+    const [availableTests, setAvailableTests] = useState<TestApplicant[]>([]);
     const [selectedTestId, setSelectedTestId] = useState<string>("");
     const [showTestSelection, setShowTestSelection] = useState(false);
 
@@ -122,10 +161,12 @@ export default function ExamPage() {
                         title,
                         programming_language,
                         difficulty
-                    )
+                    ),
+                    applicant_id,
+                    status
                 `)
                 .eq('applicant_id', user.id)
-                .eq('status', 'pending');
+                .eq('status', 'pending') as { data: DatabaseTestApplicant[] | null, error: any };
 
             if (testApplicantError) {
                 console.error("Error fetching test applicant:", testApplicantError);
@@ -137,12 +178,27 @@ export default function ExamPage() {
                 return;
             }
 
-            if (testApplicants.length > 1) {
+            // データを変換して保存
+            const formattedTests: TestApplicant[] = testApplicants.map(test => ({
+                id: test.id,
+                test_id: test.test_id,
+                applicant_id: test.applicant_id,
+                status: test.status as 'pending' | 'completed' | 'cancelled',
+                skill_tests: {
+                    title: test.skill_tests.title,
+                    programming_language: test.skill_tests.programming_language,
+                    difficulty: test.skill_tests.difficulty
+                }
+            }));
+
+            setAvailableTests(formattedTests);
+
+            if (formattedTests.length > 1) {
                 // モーダル表示を削除し、利用可能なテストの情報のみを保存
-                setAvailableTests(testApplicants);
+                setAvailableTests(formattedTests);
             } else {
                 // 1つしかない場合は自動的に選択
-                setSelectedTestId(testApplicants[0].test_id);
+                setSelectedTestId(formattedTests[0].test_id);
                 // テスト情報の取得処理を続行
                 const { data: testData, error: testError } = await supabase
                     .from('skill_tests')
@@ -155,7 +211,7 @@ export default function ExamPage() {
                         test_type,
                         time_limit
                     `)
-                    .eq('id', testApplicants[0].test_id)
+                    .eq('id', formattedTests[0].test_id)
                     .single();
 
                 if (testError) {
@@ -164,7 +220,7 @@ export default function ExamPage() {
                 }
 
                 if (testData) {
-                    setTestId(testApplicants[0].test_id);
+                    setTestId(formattedTests[0].test_id);
                     setTestInfo(testData);
                     setTimeLeft(testData.time_limit * 60);
 
@@ -172,7 +228,7 @@ export default function ExamPage() {
                     const { data: questionData, error: questionError } = await supabase
                         .from('test_questions')
                         .select('question_text')
-                        .eq('test_id', testApplicants[0].test_id)
+                        .eq('test_id', formattedTests[0].test_id)
                         .single();
 
                     if (questionError) {
