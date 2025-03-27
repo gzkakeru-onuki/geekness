@@ -7,6 +7,48 @@ import 'prismjs/components/prism-javascript';
 import 'prismjs/themes/prism.css';
 import { supabase } from "@/app/utils/supabase";
 
+// テスト選択用のモーダルコンポーネントを追加
+const TestSelectionModal = ({ tests, onSelect, onClose }) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">受験するテストを選択</h2>
+                <div className="grid gap-4 mb-6">
+                    {tests.map((test) => (
+                        <button
+                            key={test.id}
+                            onClick={() => onSelect(test.test_id)}
+                            className="bg-white border-2 border-indigo-100 hover:border-indigo-500 rounded-xl p-4 text-left transition-all duration-300"
+                        >
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h3 className="font-semibold text-lg text-gray-800">
+                                        {test.skill_tests.title}
+                                    </h3>
+                                    <div className="mt-2 flex gap-4 text-sm text-gray-600">
+                                        <span>言語: {test.skill_tests.programming_language}</span>
+                                        <span>難易度: {test.skill_tests.difficulty}</span>
+                                    </div>
+                                </div>
+                                <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+                <div className="flex justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                    >
+                        キャンセル
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export default function ExamPage() {
     const [name, setName] = useState("");
@@ -25,6 +67,9 @@ export default function ExamPage() {
         test_type: "",
         time_limit: 0
     });
+    const [availableTests, setAvailableTests] = useState<Array<{ id: string, test_id: string }>>([]);
+    const [selectedTestId, setSelectedTestId] = useState<string>("");
+    const [showTestSelection, setShowTestSelection] = useState(false);
 
     // ページ読み込み時にプロフィール情報を取得
     useEffect(() => {
@@ -68,62 +113,76 @@ export default function ExamPage() {
             }
 
             // 2. 受験可能なテストがあるか確認
-            const { data: testApplicant, error: testApplicantError } = await supabase
+            const { data: testApplicants, error: testApplicantError } = await supabase
                 .from('test_applicants')
-                .select('id, test_id')
+                .select(`
+                    id,
+                    test_id,
+                    skill_tests (
+                        title,
+                        programming_language,
+                        difficulty
+                    )
+                `)
                 .eq('applicant_id', user.id)
-                .eq('status', 'pending')
-                .single();
+                .eq('status', 'pending');
 
             if (testApplicantError) {
                 console.error("Error fetching test applicant:", testApplicantError);
                 return;
             }
 
-            if (!testApplicant) {
+            if (!testApplicants || testApplicants.length === 0) {
                 console.error("受験可能なテストが見つかりません");
                 return;
             }
 
-            // 3. テスト情報を取得
-            const { data: testData, error: testError } = await supabase
-                .from('skill_tests')
-                .select(`
-                    title,
-                    category,
-                    programming_language,
-                    experience_level,
-                    difficulty,
-                    test_type,
-                    time_limit
-                `)
-                .eq('id', testApplicant.test_id)
-                .single();
-
-            if (testError) {
-                console.error("Error fetching test data:", testError);
-                return;
-            }
-
-            if (testData) {
-                setTestId(testApplicant.test_id);
-                setTestInfo(testData);
-                setTimeLeft(testData.time_limit * 60); // 分を秒に変換
-
-                // 4. 問題文を取得
-                const { data: questionData, error: questionError } = await supabase
-                    .from('test_questions')
-                    .select('question_text')
-                    .eq('test_id', testApplicant.test_id)
+            if (testApplicants.length > 1) {
+                // モーダル表示を削除し、利用可能なテストの情報のみを保存
+                setAvailableTests(testApplicants);
+            } else {
+                // 1つしかない場合は自動的に選択
+                setSelectedTestId(testApplicants[0].test_id);
+                // テスト情報の取得処理を続行
+                const { data: testData, error: testError } = await supabase
+                    .from('skill_tests')
+                    .select(`
+                        title,
+                        category,
+                        programming_language,
+                        experience_level,
+                        difficulty,
+                        test_type,
+                        time_limit
+                    `)
+                    .eq('id', testApplicants[0].test_id)
                     .single();
 
-                if (questionError) {
-                    console.error("Error fetching question:", questionError);
+                if (testError) {
+                    console.error("Error fetching test data:", testError);
                     return;
                 }
 
-                if (questionData) {
-                    setQuestion(questionData.question_text);
+                if (testData) {
+                    setTestId(testApplicants[0].test_id);
+                    setTestInfo(testData);
+                    setTimeLeft(testData.time_limit * 60);
+
+                    // 問題文を取得
+                    const { data: questionData, error: questionError } = await supabase
+                        .from('test_questions')
+                        .select('question_text')
+                        .eq('test_id', testApplicants[0].test_id)
+                        .single();
+
+                    if (questionError) {
+                        console.error("Error fetching question:", questionError);
+                        return;
+                    }
+
+                    if (questionData) {
+                        setQuestion(questionData.question_text);
+                    }
                 }
             }
         } catch (error: any) {
@@ -210,11 +269,12 @@ export default function ExamPage() {
                 return;
             }
 
-            // test_applicantsテーブルから受験者情報を取得
+            // test_applicantsテーブルから特定のテストの受験者情報を取得
             const { data: testApplicant, error: testApplicantError } = await supabase
                 .from('test_applicants')
                 .select('id')
                 .eq('applicant_id', user.id)
+                .eq('test_id', testId)  // 選択されているテストIDで絞り込み
                 .eq('status', 'pending')
                 .single();
 
@@ -230,7 +290,7 @@ export default function ExamPage() {
                 .insert({
                     id: crypto.randomUUID(),
                     test_id: testId,
-                    applicant_id: testApplicant.id,
+                    applicant_id: user.id,
                     answer: question,
                     score: scores.total_score,
                     code_quality_score: scores.code_quality,
@@ -294,9 +354,52 @@ export default function ExamPage() {
         return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
     };
 
+    // テスト選択ハンドラーを追加
+    const handleTestSelect = async (testId: string) => {
+        setSelectedTestId(testId);
+        setShowTestSelection(false);
+
+        // 選択されたテストの情報を取得
+        const { data: testData, error: testError } = await supabase
+            .from('skill_tests')
+            .select(`
+                title,
+                category,
+                programming_language,
+                experience_level,
+                difficulty,
+                test_type,
+                time_limit
+            `)
+            .eq('id', testId)
+            .single();
+
+        if (testError) {
+            console.error("Error fetching test data:", testError);
+            return;
+        }
+
+        if (testData) {
+            setTestId(testId);
+            setTestInfo(testData);
+            setTimeLeft(testData.time_limit * 60);
+
+            // 問題文を取得
+            const { data: questionData, error: questionError } = await supabase
+                .from('test_questions')
+                .select('question_text')
+                .eq('test_id', testId)
+                .single();
+
+            if (questionData) {
+                setQuestion(questionData.question_text);
+            }
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-            {/* ヘッダーセクション - stickyで固定 */}
+            {/* ヘッダーセクション */}
             <header className="bg-white/90 backdrop-blur-lg shadow-lg p-6 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex justify-between items-center mb-4">
@@ -315,15 +418,26 @@ export default function ExamPage() {
                                 </div>
                             </div>
                         </div>
-                        {/* タイマー表示 */}
-                        {isStarted && (
-                            <div className={`px-4 py-2 rounded-lg bg-white border-2 ${timeLeft < 300 ? 'border-red-500 text-red-600' : 'border-indigo-500 text-indigo-600'} font-bold text-xl`}>
-                                残り時間: {formatTime(timeLeft)}
-                            </div>
-                        )}
+                        <div className="flex items-center space-x-4">
+                            {/* テスト選択ボタンを追加 */}
+                            {!isStarted && availableTests.length > 1 && (
+                                <button
+                                    onClick={() => setShowTestSelection(true)}
+                                    className="px-4 py-2 bg-white border-2 border-indigo-200 text-indigo-600 rounded-lg font-semibold hover:border-indigo-500 transition-all duration-300"
+                                >
+                                    テストを選択
+                                </button>
+                            )}
+                            {/* タイマー表示 */}
+                            {isStarted && (
+                                <div className={`px-4 py-2 rounded-lg bg-white border-2 ${timeLeft < 300 ? 'border-red-500 text-red-600' : 'border-indigo-500 text-indigo-600'} font-bold text-xl`}>
+                                    残り時間: {formatTime(timeLeft)}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* テスト情報の追加 */}
+                    {/* テスト情報の表示 */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                         <div className="bg-white/50 rounded-lg p-3">
                             <span className="text-xs text-gray-500">カテゴリ</span>
@@ -383,7 +497,31 @@ export default function ExamPage() {
                         )}
                     </div>
 
-                    {!isStarted ? (
+                    {!selectedTestId ? (
+                        // テスト未選択時の表示
+                        <div className="text-center py-12">
+                            <div className="mb-6">
+                                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 4v16m8-16v16m-8 0h8M4 4h16" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-xl font-semibold text-gray-800 mb-2">テストを選択してください</h3>
+                                <p className="text-gray-600 mb-4">
+                                    「テストを選択」ボタンから、受験するテストを選択してください。
+                                </p>
+                                <div className="flex justify-center">
+                                    <button
+                                        onClick={() => setShowTestSelection(true)}
+                                        className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-300 transform hover:scale-[1.02]"
+                                    >
+                                        テストを選択する
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : !isStarted ? (
+                        // テスト選択済み・未開始時の表示
                         <div className="text-center py-12">
                             <div className="mb-6">
                                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -402,6 +540,7 @@ export default function ExamPage() {
                             </button>
                         </div>
                     ) : (
+                        // テスト開始後の表示（エディタ部分）
                         <>
                             <div className="bg-gray-50 rounded-xl p-4 mb-6">
                                 <Editor
@@ -441,6 +580,14 @@ export default function ExamPage() {
                     )}
                 </div>
             </main>
+
+            {showTestSelection && (
+                <TestSelectionModal
+                    tests={availableTests}
+                    onSelect={handleTestSelect}
+                    onClose={() => setShowTestSelection(false)}
+                />
+            )}
         </div>
     );
 }
