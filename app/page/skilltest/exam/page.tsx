@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Editor from 'react-simple-code-editor';
 import { highlight, languages } from 'prismjs';
 import 'prismjs/components/prism-clike';
@@ -126,12 +126,12 @@ export default function ExamPage() {
                     setQuestion(questionData.question_text);
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error in fetchProfile:", error);
         }
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = useCallback(async () => {
         try {
             if (!name || !email || !question) {
                 alert("すべてのフィールドを入力してください。");
@@ -255,7 +255,7 @@ export default function ExamPage() {
             console.error("Error in handleSubmit:", error);
             alert("エラーが発生しました。");
         }
-    };
+    }, [name, email, question, testId]);
 
     // タイマー機能
     useEffect(() => {
@@ -277,7 +277,7 @@ export default function ExamPage() {
                 clearInterval(timer);
             }
         };
-    }, [isStarted]);
+    }, [isStarted, timeLeft, handleSubmit]);
 
     // テスト開始ハンドラー
     const handleStart = () => {

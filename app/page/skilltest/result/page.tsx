@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Editor from 'react-simple-code-editor';
 import { highlight, languages } from 'prismjs';
@@ -49,12 +49,27 @@ interface ApplicantProfile {
     applicant_email: string;
 }
 
-interface Application {
+interface Company {
     id: string;
-    applicant_id: string;
+    name: string;
+}
+
+interface TestData {
+    test_id: string;
+    skill_tests: {
+        title: string;
+    };
+}
+
+interface DatabaseApplication {
     company_id: string;
-    status: string;
-    applicant_profiles: ApplicantProfile;
+    companies: Company[];
+    test_data: {
+        test_id: string;
+        skill_tests: {
+            title: string;
+        }[];
+    }[];
 }
 
 interface TestResponse {
@@ -72,21 +87,30 @@ interface TestResponse {
 }
 
 interface CompanyTest {
-    companyId: string;
-    companyName: string;
-    tests: Array<{
+    id: string;
+    name: string;
+    tests: {
         id: string;
         title: string;
-    }>;
+    }[];
 }
 
 interface Applicant {
     id: string;
     name: string;
-    tests: Array<{
+    tests: {
         id: string;
         title: string;
-    }>;
+    }[];
+}
+
+interface FormattedApplicant {
+    companyId: string;
+    companyName: string;
+    tests: {
+        id: string;
+        title: string;
+    }[];
 }
 
 function SkillTestResultContent() {
@@ -98,168 +122,11 @@ function SkillTestResultContent() {
     const [review, setReview] = useState("");
     const [testResponse, setTestResponse] = useState<TestResponse | null>(null);
     const [selectedTestId, setSelectedTestId] = useState<string>("");
-    const [applicants, setApplicants] = useState<CompanyTest[] | Applicant[]>([]);
+    const [applicants, setApplicants] = useState<CompanyTest[]>([]);
     const [selectedApplicantId, setSelectedApplicantId] = useState<string>("");
     const [activeTab, setActiveTab] = useState<'test' | 'interview'>('test');
 
-    useEffect(() => {
-        fetchUserData();
-    }, []);
-
-    // テスト選択時の処理を追加
-    useEffect(() => {
-        if (selectedTestId) {
-            fetchApplicantData(selectedTestId);
-        }
-    }, [selectedTestId]);
-
-    const fetchUserData = async () => {
-        try {
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-            console.log("Current user:", user);
-
-            if (userError) {
-                console.error("Error fetching user:", userError);
-                return;
-            }
-
-            if (user) {
-                // applicant_profilesをチェック
-                const { data: applicantProfile } = await supabase
-                    .from('applicant_profiles')
-                    .select('*')
-                    .eq('id', user.id)
-                    .maybeSingle();
-                console.log("Applicant profile:", applicantProfile); // 応募者プロフィール                
-
-                // recruiter_profilesをチェック
-                const { data: recruiterProfile } = await supabase
-                    .from('recruiter_profiles')
-                    .select('*')
-                    .eq('id', user.id)
-                    .maybeSingle();
-                console.log("Recruiter profile:", recruiterProfile); // 企業担当者プロフィール
-
-                if (applicantProfile) {
-                    setUserType("applicant");
-                    setName(applicantProfile.applicant_lastname + applicantProfile.applicant_firstname);
-
-                    // 応募者の申請情報を取得
-                    const { data: applications, error: appError } = await supabase
-                        .from('applications')
-                        .select(`
-                            id,
-                            company_id,
-                            companies (
-                                id,
-                                name
-                            )
-                        `)
-                        .eq('applicant_id', user.id)
-                        .eq('status', 'pending');
-
-                    console.log("Applications data:", applications);
-
-                    if (appError) {
-                        console.error("Error fetching applications:", appError);
-                        return;
-                    }
-
-                    if (applications) {
-                        // 応募者のテスト情報を別途取得
-                        const applicationsWithTests = await Promise.all(
-                            applications.map(async (app) => {
-                                // test_applicantsを介してテスト情報を取得
-                                const { data: testData } = await supabase
-                                    .from('test_applicants')
-                                    .select(`
-                                        test_id,
-                                        skill_tests (
-                                            id,
-                                            title
-                                        )
-                                    `)
-                                    .eq('applicant_id', user.id);
-
-                                console.log("Test data for application:", testData);
-
-                                return {
-                                    companyId: app.company_id,
-                                    companyName: app.companies.name,
-                                    tests: testData?.map(td => ({
-                                        id: td.test_id,
-                                        title: td.skill_tests.title
-                                    })) || []
-                                };
-                            })
-                        );
-
-                        console.log("Applications with tests:", applicationsWithTests);
-                        setApplicants(applicationsWithTests);
-                    }
-                } else if (recruiterProfile) {
-                    setUserType("recruiter");
-
-                    // 1. まず応募者の情報を取得
-                    const { data: applications, error } = await supabase
-                        .from('applications')
-                        .select(`
-                            id,
-                            applicant_id,
-                            applicant_profiles!inner (
-                                id,
-                                applicant_lastname,
-                                applicant_firstname
-                            )
-                        `)
-                        .eq('company_id', recruiterProfile.company_id)
-                        .eq('status', 'pending');
-
-                    console.log("Applications data:", applications);
-
-                    if (error) {
-                        console.error("Error fetching applicants:", error);
-                        return;
-                    }
-
-                    if (applications) {
-                        const applicantsWithTests = await Promise.all(
-                            applications.map(async (app) => {
-                                // test_applicantsを介してテスト情報を取得
-                                const { data: testApplicants } = await supabase
-                                    .from('test_applicants')
-                                    .select(`
-                                        id,
-                                        test_id,
-                                        skill_tests!inner (
-                                            id,
-                                            title
-                                        )
-                                    `)
-                                    .eq('applicant_id', app.applicant_id);
-
-                                return {
-                                    id: app.applicant_id,
-                                    name: `${app.applicant_profiles.applicant_lastname} ${app.applicant_profiles.applicant_firstname}`,
-                                    tests: testApplicants?.map(ta => ({
-                                        id: ta.test_id,
-                                        title: ta.skill_tests.title
-                                    })) || []
-                                };
-                            })
-                        );
-
-                        console.log("Formatted applicants with tests:", applicantsWithTests);
-                        setApplicants(applicantsWithTests);
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Error in fetchUserData:", error);
-        }
-    };
-
-    const fetchApplicantData = async (testId: string) => {
+    const fetchApplicantData = useCallback(async (testId: string) => {
         try {
             console.log("Fetching test data for testId:", testId);
             console.log("Current userType:", userType);
@@ -314,6 +181,66 @@ function SkillTestResultContent() {
             }
         } catch (error) {
             console.error("Error fetching applicant data:", error);
+        }
+    }, [userType, selectedApplicantId]);
+
+    useEffect(() => {
+        fetchUserData();
+    }, []);
+
+    // テスト選択時の処理を追加
+    useEffect(() => {
+        if (selectedTestId) {
+            fetchApplicantData(selectedTestId);
+        }
+    }, [selectedTestId, fetchApplicantData]);
+
+    const fetchUserData = async () => {
+        try {
+            // 現在のユーザー情報を取得
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                console.error('ユーザー情報が取得できません');
+                return;
+            }
+
+            // ユーザーの応募情報を取得
+            const { data: applications, error: applicationsError } = await supabase
+                .from('applications')
+                .select(`
+                    company_id,
+                    companies (
+                        id,
+                        name
+                    ),
+                    test_data:test_applicants (
+                        test_id,
+                        skill_tests (
+                            title
+                        )
+                    )
+                `)
+                .eq('applicant_id', user.id);
+
+            if (applicationsError) {
+                console.error('応募情報の取得に失敗しました:', applicationsError);
+                return;
+            }
+
+            // 応募情報を整形
+            const formattedData = (applications || []).map((app: any) => ({
+                id: app.company_id,
+                name: app.companies[0]?.name || '',
+                tests: (app.test_data || []).map((td: any) => ({
+                    id: td.test_id,
+                    title: td.skill_tests[0]?.title || ''
+                }))
+            }));
+
+            console.log("Formatted applicants with tests:", formattedData);
+            setApplicants(formattedData);
+        } catch (error) {
+            console.error('Error fetching user data:', error);
         }
     };
 
@@ -415,7 +342,7 @@ function SkillTestResultContent() {
                                     className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300"
                                 >
                                     <option key="default" value="">選択してください</option>
-                                    {(applicants as Applicant[]).map(applicant => (
+                                    {(applicants as CompanyTest[]).map(applicant => (
                                         <option key={applicant.id} value={applicant.id}>
                                             {applicant.name}
                                         </option>
@@ -432,13 +359,11 @@ function SkillTestResultContent() {
                                             className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300"
                                         >
                                             <option key="default" value="">選択してください</option>
-                                            {(applicants as Applicant[])
-                                                .find(a => a.id === selectedApplicantId)
-                                                ?.tests.map(test => (
-                                                    <option key={test.id} value={test.id}>
-                                                        {test.title}
-                                                    </option>
-                                                ))}
+                                            {(applicants as CompanyTest[]).find(a => a.id === selectedApplicantId)?.tests.map(test => (
+                                                <option key={test.id} value={test.id}>
+                                                    {test.title}
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
                                 )}
@@ -455,8 +380,8 @@ function SkillTestResultContent() {
                                 >
                                     <option value="">選択してください</option>
                                     {(applicants as CompanyTest[]).map(company => (
-                                        <option key={company.companyId} value={company.companyId}>
-                                            {company.companyName}
+                                        <option key={company.id} value={company.id}>
+                                            {company.name}
                                         </option>
                                     ))}
                                 </select>
@@ -471,7 +396,7 @@ function SkillTestResultContent() {
                                             className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300"
                                         >
                                             <option value="">選択してください</option>
-                                            {(applicants as CompanyTest[]).find(c => c.companyId === selectedApplicantId)?.tests.map(test => (
+                                            {(applicants as CompanyTest[]).find(c => c.id === selectedApplicantId)?.tests.map(test => (
                                                 <option key={test.id} value={test.id}>
                                                     {test.title}
                                                 </option>
@@ -488,7 +413,7 @@ function SkillTestResultContent() {
                                 <h3 className="text-sm font-medium text-gray-500 mb-1">受験者情報</h3>
                                 <p className="text-lg font-semibold text-gray-800">
                                     {userType === "applicant" ? name :
-                                        (applicants as Applicant[]).find(a => a.id === selectedApplicantId)?.name || "未選択"}
+                                        (applicants as CompanyTest[]).find(a => a.id === selectedApplicantId)?.name || "未選択"}
                                 </p>
                             </div>
 

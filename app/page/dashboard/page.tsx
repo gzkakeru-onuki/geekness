@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/utils/supabase";
 import Link from "next/link";
@@ -20,6 +20,14 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Dashboard() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <DashboardContent />
+        </Suspense>
+    );
+}
+
+function DashboardContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user, signOut } = useAuth();
@@ -27,6 +35,8 @@ export default function Dashboard() {
     const [userData, setUserData] = useState<any>(null);
 
     useEffect(() => {
+        if (!searchParams) return;
+
         const type = searchParams.get("type");
         setUserType(type);
 

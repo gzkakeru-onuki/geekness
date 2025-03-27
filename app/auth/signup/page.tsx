@@ -85,21 +85,21 @@ export default function Signup() {
                     .from('applicant_profiles')
                     .insert({
                         id: data.user?.id,
+                        auth_user_id: data.user?.id,
                         applicant_firstname: firstName,
                         applicant_lastname: lastName,
                         applicant_email: email,
                         applicant_phone: phoneNumber,
-                        // 初期値として空または配列を設定
                         applicant_address: "",
                         applicant_birthday: null,
                         applicant_gender: null,
                         applicant_languages: "",
                         applicant_hobbies: "",
                         applicant_self_introduction: "",
-                        applicant_education: [],
-                        applicant_experience: [],
-                        applicant_skills: [],
-                        applicant_certifications: [],
+                        applicant_education: "[]",
+                        applicant_experience: "[]",
+                        applicant_skills: "[]",
+                        applicant_certifications: "[]",
                         created_at: new Date().toISOString(),
                         updated_at: new Date().toISOString()
                     });
@@ -172,9 +172,9 @@ export default function Signup() {
                 router.push("/page/dashboard?type=recruiter");
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Signup error:", error);
-            alert(`サインアップに失敗しました: ${error.message}`);
+            alert(`サインアップに失敗しました: ${error?.message || 'エラーが発生しました'}`);
         }
     };
 

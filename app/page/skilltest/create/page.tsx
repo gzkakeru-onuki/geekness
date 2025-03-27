@@ -10,6 +10,32 @@ import 'prismjs/themes/prism.css'; // シンタックスハイライトのスタ
 import 'prismjs/components/prism-markdown';
 import { supabase } from "@/app/utils/supabase";
 
+interface Applicant {
+    id: string;
+    name: string;
+}
+
+interface ApplicantProfile {
+    id: string;
+    applicant_lastname: string;
+    applicant_firstname: string;
+}
+
+interface Application {
+    id: string;
+    applicant_id: string;
+    applicant_profiles: ApplicantProfile;
+}
+
+interface DatabaseApplication {
+    id: string;
+    applicant_id: string;
+    applicant_profiles: {
+        id: string;
+        applicant_lastname: string;
+        applicant_firstname: string;
+    }[];
+}
 
 export default function SkillTestCreation() {
     const [prompt, setPrompt] = useState("");
@@ -41,24 +67,11 @@ export default function SkillTestCreation() {
                     return;
                 }
 
-                // 企業のIDを取得
-                const { data: recruiterData, error: recruiterError } = await supabase
-                    .from('recruiter_profiles')
-                    .select('company_id')
-                    .eq('id', user.id)
-                    .single();
-
-
-
-                if (recruiterError) {
-                    console.error('企業情報の取得に失敗しました:', recruiterError);
-                    return;
-                }
-
                 // applicationsテーブルから企業の応募者を取得
-                const { data: applications, error: applicationsError } = await supabase
+                const { data: applications, error } = await supabase
                     .from('applications')
                     .select(`
+                        id,
                         applicant_id,
                         applicant_profiles (
                             id,
@@ -66,25 +79,21 @@ export default function SkillTestCreation() {
                             applicant_firstname
                         )
                     `)
-                    .eq('company_id', recruiterData.company_id)
+                    .eq('company_id', user.id)
                     .eq('status', 'pending');
 
-                if (applicationsError) {
-                    console.error('応募者データの取得に失敗しました:', applicationsError);
-                    return;
-                }
+                if (error) throw error;
 
                 // 応募者データを整形
-                const formattedApplicants = applications
-                    .filter(app => app.applicant_profiles) // nullチェック
-                    .map(app => ({
+                const formattedApplicants = (applications || [])
+                    .map((app: DatabaseApplication) => ({
                         id: app.applicant_id,
-                        name: `${app.applicant_profiles.applicant_lastname} ${app.applicant_profiles.applicant_firstname}`
+                        name: `${app.applicant_profiles[0]?.applicant_lastname || ''} ${app.applicant_profiles[0]?.applicant_firstname || ''}`
                     }));
 
                 setApplicants(formattedApplicants);
             } catch (error) {
-                console.error('データの取得中にエラーが発生しました:', error);
+                console.error('Error fetching applicants:', error);
             }
         };
 
@@ -137,7 +146,7 @@ export default function SkillTestCreation() {
             else {
                 throw new Error(data.error || '問題の生成に失敗しました');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('エラー:', error);
             alert('エラーが発生しました。');
         } finally {
@@ -235,7 +244,7 @@ export default function SkillTestCreation() {
             alert('テストが正常に作成されました');
             router.push('/page/dashboard/?type=recruiter');
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('エラーが発生しました:', error);
             alert('テストの作成中にエラーが発生しました');
         }

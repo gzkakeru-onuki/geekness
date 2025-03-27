@@ -19,7 +19,7 @@ export default function ConfirmPage() {
         };
 
         handleEmailConfirm();
-    }, []);
+    }, [router]);
 
     return <div>メール確認中...</div>;
 }

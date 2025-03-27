@@ -16,13 +16,57 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from "next/link";
 
+interface WorkExperience {
+    company: string;
+    position: string;
+    startDate: string;
+    endDate: string;
+    isCurrently: boolean;
+}
+
+interface Skill {
+    name: string;
+    level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+    years: number;
+}
+
+interface Certification {
+    name: string;
+    issuer: string;
+    acquiredDate: string;
+    expiryDate?: string;
+}
+
+interface FormattedSkill {
+    name: string;
+    levelText: string;
+    years: number;
+}
+
+interface Profile {
+    name: string;
+    title: string;
+    experience: string;
+    skills: FormattedSkill[];
+    rating: number;
+    company: string;
+    position: string;
+}
+
+const levelMap: Record<Skill['level'], string> = {
+    'beginner': '初級',
+    'intermediate': '中級',
+    'advanced': '上級',
+    'expert': 'エキスパート'
+};
+
 export default function ApplicantPage() {
-    const [profile, setProfile] = useState({
+    const [profile, setProfile] = useState<Profile>({
         name: "",
         title: "",
         experience: "",
         skills: [],
-        rating: 4.8,
+        rating: 0,
         company: "",
         position: ""
     });
@@ -75,31 +119,23 @@ export default function ApplicantPage() {
 
             if (applicantProfile) {
                 // 各JSONデータをパース
-                const skillsData = JSON.parse(applicantProfile.applicant_skills || '[]');
-                const experienceData = JSON.parse(applicantProfile.applicant_experience || '[]');
-                const certifications = JSON.parse(applicantProfile.applicant_certifications || '[]');
+                const skillsData = JSON.parse(applicantProfile.applicant_skills || '[]') as Skill[];
+                const experienceData = JSON.parse(applicantProfile.applicant_experience || '[]') as WorkExperience[];
+                const certifications = JSON.parse(applicantProfile.applicant_certifications || '[]') as Certification[];
 
                 // 最新の職歴を取得（isCurrentlyがtrueまたは最後の要素）
-                const currentExperience = experienceData.find(exp => exp.isCurrently) || experienceData[experienceData.length - 1] || {};
+                const currentExperience = experienceData.find((exp: WorkExperience) => exp.isCurrently) || experienceData[experienceData.length - 1] || {};
 
                 // スキル情報を整形
-                const formattedSkills = skillsData.map(skill => ({
+                const formattedSkills: FormattedSkill[] = skillsData.map((skill: Skill): FormattedSkill => ({
                     name: skill.name,
-                    level: skill.level,
-                    years: skill.years,
-                    levelText: {
-                        'beginner': '初級',
-                        'intermediate': '中級',
-                        'advanced': '上級',
-                        'expert': 'エキスパート'
-                    }[skill.level] || skill.level
+                    levelText: levelMap[skill.level] || '不明',
+                    years: skill.years
                 }));
 
                 setProfile({
                     name: `${applicantProfile.applicant_lastname} ${applicantProfile.applicant_firstname}`,
-                    title: Array.isArray(certifications) && certifications.length > 0
-                        ? certifications.join(', ')
-                        : '資格なし',
+                    title: certifications.length > 0 ? certifications.map((cert: Certification) => cert.name).join(', ') : '資格なし',
                     experience: "経験者",
                     skills: formattedSkills,
                     rating: 4.8,
@@ -148,14 +184,14 @@ export default function ApplicantPage() {
                                 <div className="flex items-center space-x-4 mt-1">
                                     {profile.company && (
                                         <>
-                                            <span className="text-gray-600 bg-gray-100 px-2 py-1 rounded-full"><></>{profile.company}</span>                                            
+                                            <span className="text-gray-600 bg-gray-100 px-2 py-1 rounded-full"><></>{profile.company}</span>
                                         </>
                                     )}
                                     {profile.position && (
                                         <>
-                                            <span className="text-gray-600 bg-gray-100 px-2 py-1 rounded-full">{profile.position}</span>                                            
+                                            <span className="text-gray-600 bg-gray-100 px-2 py-1 rounded-full">{profile.position}</span>
                                         </>
-                                    )}                                    
+                                    )}
                                 </div>
                             </div>
                         </div>

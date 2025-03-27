@@ -132,7 +132,7 @@ export default function Profile() {
                 // どちらにも登録がない場合はデフォルトでapplicantとして扱う
                 setIsRecruiter(false);
 
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error checking user type:', error);
                 setIsRecruiter(false); // エラー時はデフォルトでapplicantとして扱う
             }

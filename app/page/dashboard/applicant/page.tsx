@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/app/utils/supabase";
 import {
     BriefcaseIcon,
@@ -49,14 +49,7 @@ export default function ApplicantDashboard() {
 
     const [applications, setApplications] = useState<Application[]>([]);
 
-    useEffect(() => {
-        if (user) {
-            fetchApplications();
-            fetchStats();
-        }
-    }, [user]);
-
-    const fetchApplications = async () => {
+    const fetchApplications = useCallback(async () => {
         if (!user) return;
 
         try {
@@ -78,9 +71,9 @@ export default function ApplicantDashboard() {
         } catch (error) {
             console.error('Error fetching applications:', error);
         }
-    };
+    }, [user]);
 
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async () => {
         if (!user) return;
 
         try {
@@ -104,7 +97,12 @@ export default function ApplicantDashboard() {
         } catch (error) {
             console.error('Error fetching stats:', error);
         }
-    };
+    }, [user]);
+
+    useEffect(() => {
+        fetchApplications();
+        fetchStats();
+    }, [fetchApplications, fetchStats]);
 
     const getStatusColor = (status: Application['status']) => {
         const colors = {
