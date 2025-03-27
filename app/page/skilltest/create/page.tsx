@@ -61,10 +61,22 @@ export default function SkillTestCreation() {
             try {
                 // 現在ログインしているユーザー（企業）の情報を取得
                 const { data: { user } } = await supabase.auth.getUser();
-                console.log('ログイン中のユーザー:', user?.id);
+                console.log('👤 ログイン中のユーザー情報:', user);
                 if (!user) {
-                    console.error('ユーザー情報が取得できません');
+                    console.error('❌ ユーザー情報が取得できません');
                     return;
+                }
+
+                // まず、recruiter_profilesからcompany_idを取得
+                const { data: recruiterData, error: recruiterError } = await supabase
+                    .from('recruiter_profiles')
+                    .select('company_id')
+                    .eq('id', user.id)
+                    .single();
+
+                if (recruiterError) {
+                    console.error('❌ 企業情報の取得エラー:', recruiterError);
+                    throw recruiterError;
                 }
 
                 // applicationsテーブルから企業の応募者を取得
@@ -73,27 +85,32 @@ export default function SkillTestCreation() {
                     .select(`
                         id,
                         applicant_id,
-                        applicant_profiles (
+                        auth_users:applicant_id (
                             id,
-                            applicant_lastname,
-                            applicant_firstname
+                            applicant_email,
+                            applicant_firstname,
+                            applicant_lastname
                         )
                     `)
-                    .eq('company_id', user.id)
+                    .eq('company_id', recruiterData.company_id)
                     .eq('status', 'pending');
 
-                if (error) throw error;
+                console.log('📝 取得した応募者データ:', applications);
+                if (error) {
+                    console.error('❌ 応募者データの取得エラー:', error);
+                    throw error;
+                }
 
                 // 応募者データを整形
                 const formattedApplicants = (applications || [])
-                    .map((app: DatabaseApplication) => ({
+                    .map((app: any) => ({
                         id: app.applicant_id,
-                        name: `${app.applicant_profiles[0]?.applicant_lastname || ''} ${app.applicant_profiles[0]?.applicant_firstname || ''}`
+                        name: `${app.auth_users?.applicant_lastname || ''} ${app.auth_users?.applicant_firstname || ''}`
                     }));
 
                 setApplicants(formattedApplicants);
             } catch (error) {
-                console.error('Error fetching applicants:', error);
+                console.error('❌ fetchApplicants エラー:', error);
             }
         };
 
@@ -108,6 +125,15 @@ export default function SkillTestCreation() {
 
         setLoading(true);
         try {
+            console.log('🚀 テスト作成開始', {
+                category,
+                language,
+                experience,
+                difficulty,
+                questionCount,
+                prompt
+            });
+
             // GeminiAPIを呼び出し
             const response = await fetch('/api/gemini', {
                 method: 'POST',
@@ -135,11 +161,15 @@ export default function SkillTestCreation() {
                 }),
             });
 
+            console.log('📡 Gemini API レスポンス状態:', response.status);
+
             if (!response.ok) {
                 throw new Error('問題の生成に失敗しました');
             }
 
             const data = await response.json();
+            console.log('✨ 生成された問題データ:', data);
+
             if (data.success) {
                 setGeneratedQuestions(data.data);
             }
@@ -147,7 +177,7 @@ export default function SkillTestCreation() {
                 throw new Error(data.error || '問題の生成に失敗しました');
             }
         } catch (error: any) {
-            console.error('エラー:', error);
+            console.error('❌ テスト作成エラー:', error);
             alert('エラーが発生しました。');
         } finally {
             setLoading(false);
@@ -158,13 +188,18 @@ export default function SkillTestCreation() {
         setConfirm(true);
         const confirm = window.confirm("テストを確定しますか？");
         if (!confirm) {
+            console.log('❌ テスト確定がキャンセルされました');
             alert("テストを確定しませんでした。");
             return;
         }
 
         try {
+            console.log('🔄 テスト確定処理開始');
+
             // ログイン中の企業IDを取得
             const { data: { user } } = await supabase.auth.getUser();
+            console.log('👤 確定処理 - ユーザー情報:', user);
+
             if (!user) {
                 throw new Error('ユーザー情報が取得できません');
             }
@@ -241,11 +276,12 @@ export default function SkillTestCreation() {
                 throw assignmentError;
             }
 
+            console.log('✅ テスト作成完了:', testData);
             alert('テストが正常に作成されました');
             router.push('/page/dashboard/?type=recruiter');
 
         } catch (error: any) {
-            console.error('エラーが発生しました:', error);
+            console.error('❌ テスト確定エラー:', error);
             alert('テストの作成中にエラーが発生しました');
         }
     };
