@@ -7,6 +7,9 @@ import PersonIcon from '@mui/icons-material/Person';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from "@/app/contexts/AuthContext";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { ErrorMessage } from "@/components/common/ErrorMessage";
 import {
     UserGroupIcon,
     DocumentTextIcon,
@@ -21,7 +24,7 @@ import {
 
 export default function Dashboard() {
     return (
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense fallback={<LoadingSpinner />}>
             <DashboardContent />
         </Suspense>
     );
@@ -83,91 +86,54 @@ function DashboardContent() {
     };
 
     if (isLoading) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-                <div className="bg-white p-8 rounded-xl shadow-lg">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">読み込み中...</p>
-                </div>
-            </div>
-        );
+        return <LoadingSpinner />;
     }
 
     if (error) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-                <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-                    <div className="text-red-500 mb-4">
-                        <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <p className="text-gray-700">{error}</p>
-                    <button
-                        onClick={() => window.location.reload()}
-                        className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                    >
-                        再試行
-                    </button>
-                </div>
-            </div>
-        );
+        return <ErrorMessage message={error} onRetry={() => window.location.reload()} />;
     }
 
     if (!userType) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-                <div className="text-center">
-                    <h1 className="text-2xl font-bold text-gray-800 mb-4">ユーザータイプが指定されていません</h1>
-                    <Link href="/" className="text-indigo-600 hover:text-indigo-700">
-                        ホームに戻る
-                    </Link>
-                </div>
-            </div>
-        );
+        return <ErrorMessage message="ユーザータイプが指定されていません" onRetry={() => router.push("/")} />;
     }
+
+    const headerActions = (
+        <>
+            <Link
+                href={`/page/dashboard/profile`}
+                className="flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300"
+            >
+                <PersonIcon className="mr-2" />
+                プロフィール
+            </Link>
+            <Link
+                href="/page/dashboard/settings"
+                className="flex items-center px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-300"
+            >
+                <SettingsIcon className="mr-2" />
+                設定
+            </Link>
+            <button
+                onClick={handleSignOut}
+                className="flex items-center px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all duration-300"
+            >
+                <LogoutIcon className="mr-2" />
+                ログアウト
+            </button>
+        </>
+    );
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="bg-white rounded-2xl shadow-xl p-6 backdrop-blur-sm bg-white/80">
-                    <div className="flex justify-between items-center mb-8">
-                        <div>
-                            <Link href="/">
-                                <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
-                                    Geekness
-                                </h1>
-                            </Link>
-                            <p className="text-gray-600 mt-1">
-                                {userType === "applicant" ? "採用希望者" : "企業担当者"}ダッシュボード
-                            </p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <Link
-                                href={`/page/dashboard/profile`}
-                                className="flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-500/30 transition-all duration-300"
-                            >
-                                <PersonIcon className="mr-2" />
-                                プロフィール
-                            </Link>
-                            <Link
-                                href="/page/dashboard/settings"
-                                className="flex items-center px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-300"
-                            >
-                                <SettingsIcon className="mr-2" />
-                                設定
-                            </Link>
-                            <button
-                                onClick={handleSignOut}
-                                className="flex items-center px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all duration-300 cursor-pointer"
-                            >
-                                <LogoutIcon className="mr-2 cursor-pointer" />
-                                ログアウト
-                            </button>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Geekness"
+                        subtitle={`${userType === "applicant" ? "採用希望者" : "企業担当者"}ダッシュボード`}
+                        actions={headerActions}
+                    />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
                         {userType === "applicant" ? (
                             <>
                                 <Link href="/page/applicant" className="block focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-xl">
