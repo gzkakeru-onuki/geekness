@@ -15,6 +15,9 @@ import {
     CheckBadgeIcon
 } from '@heroicons/react/24/outline';
 import Link from "next/link";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { ErrorMessage } from "@/components/common/ErrorMessage";
 
 interface WorkExperience {
     company: string;
@@ -61,6 +64,8 @@ const levelMap: Record<Skill['level'], string> = {
 };
 
 export default function ApplicantPage() {
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [profile, setProfile] = useState<Profile>({
         name: "",
         title: "",
@@ -98,77 +103,90 @@ export default function ApplicantPage() {
 
     useEffect(() => {
         const fetchUserProfile = async () => {
-            // ログインユーザーの取得
-            const { data: { user } } = await supabase.auth.getUser();
-            console.log('ログインユーザー:', user);
-            if (!user) return;
+            try {
+                setIsLoading(true);
+                setError(null);
 
-            // applicant_profilesからユーザー情報を取得
-            const { data: applicantProfile, error: profileError } = await supabase
-                .from('applicant_profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
+                // ログインユーザーの取得
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    setError("ユーザー情報が見つかりません");
+                    return;
+                }
 
-            console.log('取得したプロフィール:', applicantProfile);
+                // applicant_profilesからユーザー情報を取得
+                const { data: applicantProfile, error: profileError } = await supabase
+                    .from('applicant_profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
 
-            if (profileError) {
-                console.error('プロフィール取得エラー:', profileError);
-                return;
-            }
+                if (profileError) {
+                    setError("プロフィールの取得に失敗しました");
+                    return;
+                }
 
-            if (applicantProfile) {
-                // 各JSONデータをパース
-                const skillsData = JSON.parse(applicantProfile.applicant_skills || '[]') as Skill[];
-                const experienceData = JSON.parse(applicantProfile.applicant_experience || '[]') as WorkExperience[];
-                const certifications = JSON.parse(applicantProfile.applicant_certifications || '[]') as Certification[];
+                if (applicantProfile) {
+                    // 各JSONデータをパース
+                    const skillsData = JSON.parse(applicantProfile.applicant_skills || '[]') as Skill[];
+                    const experienceData = JSON.parse(applicantProfile.applicant_experience || '[]') as WorkExperience[];
+                    const certifications = JSON.parse(applicantProfile.applicant_certifications || '[]') as Certification[];
 
-                // 最新の職歴を取得（isCurrentlyがtrueまたは最後の要素）
-                const currentExperience = experienceData.find((exp: WorkExperience) => exp.isCurrently) || experienceData[experienceData.length - 1] || {};
+                    // 最新の職歴を取得（isCurrentlyがtrueまたは最後の要素）
+                    const currentExperience = experienceData.find((exp: WorkExperience) => exp.isCurrently) || experienceData[experienceData.length - 1] || {};
 
-                // スキル情報を整形
-                const formattedSkills: FormattedSkill[] = skillsData.map((skill: Skill): FormattedSkill => ({
-                    name: skill.name,
-                    levelText: levelMap[skill.level] || '不明',
-                    years: skill.years
-                }));
+                    // スキル情報を整形
+                    const formattedSkills: FormattedSkill[] = skillsData.map((skill: Skill): FormattedSkill => ({
+                        name: skill.name,
+                        levelText: levelMap[skill.level] || '不明',
+                        years: skill.years
+                    }));
 
-                setProfile({
-                    name: `${applicantProfile.applicant_lastname} ${applicantProfile.applicant_firstname}`,
-                    title: certifications.length > 0 ? certifications.map((cert: Certification) => cert.name).join(', ') : '資格なし',
-                    experience: "経験者",
-                    skills: formattedSkills,
-                    rating: 4.8,
-                    company: currentExperience.company || '',
-                    position: currentExperience.position || ''
-                });
+                    setProfile({
+                        name: `${applicantProfile.applicant_lastname} ${applicantProfile.applicant_firstname}`,
+                        title: certifications.length > 0 ? certifications.map((cert: Certification) => cert.name).join(', ') : '資格なし',
+                        experience: "経験者",
+                        skills: formattedSkills,
+                        rating: 4.8,
+                        company: currentExperience.company || '',
+                        position: currentExperience.position || ''
+                    });
+                }
+            } catch (err) {
+                setError("予期せぬエラーが発生しました");
+                console.error('エラー:', err);
+            } finally {
+                setIsLoading(false);
             }
         };
 
         fetchUserProfile();
     }, []);
 
+    if (isLoading) {
+        return <LoadingSpinner />;
+    }
+
+    if (error) {
+        return <ErrorMessage message={error} />;
+    }
+
+    const headerActions = (
+        <Link href="/page/dashboard/profile" className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200">
+            <UserIcon className="w-5 h-5" />
+            <span>プロフィール</span>
+        </Link>
+    );
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-            {/* ヘッダーセクション */}
-            <header className="bg-white/90 backdrop-blur-lg shadow-lg p-6">
-                <div className="max-w-7xl mx-auto">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-                                応募状況
-                            </h1>
-                            <div className="mt-2 text-sm text-gray-600">
-                                現在の応募状況を確認できます
-                            </div>
-                        </div>
-                        <Link href="/page/dashboard/profile" className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200">
-                            <UserIcon className="w-5 h-5" />
-                            <span>プロフィール</span>
-                        </Link>
-                    </div>
-                </div>
-            </header>
+            <PageHeader
+                title="応募状況"
+                subtitle="現在の応募状況を確認できます"
+                actions={headerActions}
+                showBackButton
+                backUrl="/page/dashboard"
+            />
 
             {/* メインコンテンツ */}
             <main className="max-w-7xl mx-auto p-6">
@@ -195,10 +213,6 @@ export default function ApplicantPage() {
                                 </div>
                             </div>
                         </div>
-                        {/* <div className="flex items-center space-x-2">
-                            <StarIcon className="w-5 h-5 text-yellow-400" />
-                            <span className="text-lg font-bold text-gray-800">{profile.rating}</span>
-                        </div> */}
                     </div>
                     <div className="mt-6 flex flex-wrap gap-2">
                         {profile.skills.map((skill, index) => (
@@ -249,50 +263,32 @@ export default function ApplicantPage() {
                                         <span>{application.status}</span>
                                     </div>
                                 </div>
-                                <div className="mt-4 space-y-3">
-                                    <div className="flex items-center justify-between text-sm text-gray-600">
-                                        <div className="flex items-center">
-                                            <CalendarIcon className="w-4 h-4 mr-1" />
-                                            応募日
-                                        </div>
-                                        <span className="font-medium">{application.appliedDate}</span>
+                                <div className="mt-4 flex items-center space-x-4 text-sm text-gray-600">
+                                    <div className="flex items-center">
+                                        <CalendarIcon className="w-4 h-4 mr-1" />
+                                        <span>応募日: {application.appliedDate}</span>
                                     </div>
-                                    <div className="flex items-center justify-between text-sm text-gray-600">
-                                        <div className="flex items-center">
-                                            <ClockIcon className="w-4 h-4 mr-1" />
-                                            次のステップ
-                                        </div>
-                                        <span className="font-medium">{application.nextStep}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm text-gray-600">
-                                        <div className="flex items-center">
-                                            <CalendarIcon className="w-4 h-4 mr-1" />
-                                            予定日
-                                        </div>
-                                        <span className="font-medium">{application.nextDate}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm text-gray-600">
-                                        <div className="flex items-center">
-                                            <ChartBarIcon className="w-4 h-4 mr-1" />
-                                            スコア
-                                        </div>
-                                        <span className="font-medium">{application.score}</span>
+                                    <div className="flex items-center">
+                                        <ClockIcon className="w-4 h-4 mr-1" />
+                                        <span>次のステップ: {application.nextStep}</span>
                                     </div>
                                 </div>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {application.tags.map((tag, index) => (
-                                        <span
-                                            key={index}
-                                            className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium"
-                                        >
-                                            {tag}
-                                        </span>
-                                    ))}
+                                <div className="mt-4 flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                        <ChartBarIcon className="w-4 h-4 text-indigo-600" />
+                                        <span className="text-sm font-medium text-indigo-600">スコア: {application.score}</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {application.tags.map((tag, index) => (
+                                            <span
+                                                key={index}
+                                                className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium"
+                                            >
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
-                                <button className="mt-6 w-full flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200">
-                                    <span>詳細を見る</span>
-                                    <ArrowRightIcon className="w-4 h-4" />
-                                </button>
                             </div>
                         ))}
                     </div>
