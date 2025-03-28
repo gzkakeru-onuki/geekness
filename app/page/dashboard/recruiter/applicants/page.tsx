@@ -18,20 +18,6 @@ import {
     MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 
-interface Application {
-    id: string;
-    status: string;
-    applied_at: string;
-    applicant_id: {
-        id: string;
-        applicant_lastname: string;
-        applicant_firstname: string;
-        test_responses: {
-            score: number;
-        }[];
-    };
-}
-
 interface Applicant {
     id: string;
     name: string;
@@ -135,14 +121,14 @@ export default function RecruiterApplicantsPage() {
     const headerActions = (
         <div className="flex items-center space-x-4">
             <Link
-                href="/dashboard/recruiter/interviews"
+                href="/page/dashboard/recruiter/interviews"
                 className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
             >
                 <CalendarIcon className="w-5 h-5" />
                 <span>面接スケジュール</span>
             </Link>
             <Link
-                href="/dashboard/recruiter/jobs/new"
+                href="/page/dashboard/recruiter/jobs/new"
                 className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200"
             >
                 <DocumentTextIcon className="w-5 h-5" />
@@ -158,6 +144,7 @@ export default function RecruiterApplicantsPage() {
                 subtitle="すべての応募者を確認・管理できます"
                 actions={headerActions}
                 showBackButton
+                backUrl="/page/dashboard/recruiter"
                 className="bg-white/80 backdrop-blur-lg border-b border-gray-200"
             />
 
@@ -220,14 +207,14 @@ export default function RecruiterApplicantsPage() {
                                         </span>
                                     </div>
                                     <div className={`px-3 py-1 rounded-full text-sm font-medium ${applicant.status === 'pending'
-                                        ? 'bg-yellow-100 text-yellow-800'
-                                        : applicant.status === 'interview_scheduled'
-                                            ? 'bg-blue-100 text-blue-800'
-                                            : applicant.status === 'rejected'
-                                                ? 'bg-red-100 text-red-800'
-                                                : applicant.status === 'hired'
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : 'bg-gray-100 text-gray-800'
+                                            ? 'bg-yellow-100 text-yellow-800'
+                                            : applicant.status === 'interview_scheduled'
+                                                ? 'bg-blue-100 text-blue-800'
+                                                : applicant.status === 'rejected'
+                                                    ? 'bg-red-100 text-red-800'
+                                                    : applicant.status === 'hired'
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-gray-100 text-gray-800'
                                         }`}>
                                         {applicant.status === 'pending'
                                             ? '未レビュー'
