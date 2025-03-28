@@ -54,12 +54,30 @@ export default function RecruiterDashboard() {
     const [recentApplicants, setRecentApplicants] = useState<RecentApplicant[]>([]);
 
     const fetchApplications = useCallback(async () => {
-        if (!user) return;
+        if (!user) {
+            setError("ログインが必要です。");
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
 
         try {
-            const { data, error } = await supabase
+            // 企業プロフィールの取得
+            const { data: recruiterProfile, error: recruiterError } = await supabase
+                .from('recruiter_profiles')
+                .select('company_id')
+                .eq('id', user.id)
+                .single();
+
+            if (recruiterError) throw recruiterError;
+            if (!recruiterProfile) {
+                setError("企業プロフィールが見つかりません。");
+                return;
+            }
+
+            // 応募データの取得
+            const { data: applicationsData, error: applicationsError } = await supabase
                 .from('applications')
                 .select(`
                     id,
@@ -74,13 +92,24 @@ export default function RecruiterDashboard() {
                         )
                     )
                 `)
-                .eq('company_id', user.id)
+                .eq('company_id', recruiterProfile.company_id)
                 .order('applied_at', { ascending: false });
 
-            if (error) throw error;
-            setApplications((data || []) as unknown as Application[]);
+            if (applicationsError) throw applicationsError;
 
-            const recent = (data || []).map((app: any) => ({
+            // 応募者数の取得
+            const { count: totalApplicants, error: countError } = await supabase
+                .from('applications')
+                .select('*', { count: 'exact' })
+                .eq('company_id', recruiterProfile.company_id);
+
+            if (countError) throw countError;
+
+            // データの整形
+            const formattedApplications = (applicationsData || []) as unknown as Application[];
+            setApplications(formattedApplications);
+
+            const recent = formattedApplications.map((app) => ({
                 id: app.id,
                 name: `${app.applicant_id?.applicant_lastname || ''} ${app.applicant_id?.applicant_firstname || ''}`,
                 score: getAverageScore(app.applicant_id?.test_responses || []),
@@ -88,60 +117,27 @@ export default function RecruiterDashboard() {
                 date: app.applied_at
             }));
             setRecentApplicants(recent);
+
+            // 統計情報の計算
+            const totalScore = recent.reduce((sum, applicant) => sum + applicant.score, 0);
+            const applicantsWithScore = recent.filter(app => app.score > 0).length;
+            const overallAverageScore = applicantsWithScore > 0
+                ? Math.round(totalScore / applicantsWithScore)
+                : 0;
+
+            setStats({
+                totalApplicants: totalApplicants || 0,
+                pendingReviews: formattedApplications.filter(app => app.status === 'pending').length,
+                upcomingInterviews: formattedApplications.filter(app => app.status === 'interview_scheduled').length,
+                averageScore: overallAverageScore
+            });
         } catch (error) {
-            console.error('Error fetching applications:', error);
-            setError("応募者データの取得に失敗しました。");
+            console.error('Error fetching data:', error);
+            setError("データの取得中にエラーが発生しました。");
         } finally {
             setIsLoading(false);
         }
     }, [user]);
-
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!user) {
-                setError("ログインが必要です。");
-                return;
-            }
-
-            try {
-                const { data: recruiterProfile, error: recruiterError } = await supabase
-                    .from('recruiter_profiles')
-                    .select('company_id')
-                    .eq('id', user.id)
-                    .single();
-
-                if (recruiterError) throw recruiterError;
-                if (!recruiterProfile) {
-                    setError("企業プロフィールが見つかりません。");
-                    return;
-                }
-
-                const { count: totalApplicants, error: applicantsError } = await supabase
-                    .from('applications')
-                    .select('*', { count: 'exact' })
-                    .eq('company_id', recruiterProfile.company_id);
-
-                if (applicantsError) throw applicantsError;
-
-                const totalScore = recentApplicants.reduce((sum, applicant) => sum + applicant.score, 0);
-                const applicantsWithScore = recentApplicants.filter(app => app.score > 0).length;
-                const overallAverageScore = applicantsWithScore > 0
-                    ? Math.round(totalScore / applicantsWithScore)
-                    : 0;
-
-                setStats(prev => ({
-                    ...prev,
-                    totalApplicants: totalApplicants || 0,
-                    averageScore: overallAverageScore
-                }));
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                setError("データの取得中にエラーが発生しました。");
-            }
-        };
-
-        fetchData();
-    }, [recentApplicants, user]);
 
     useEffect(() => {
         fetchApplications();
@@ -149,7 +145,7 @@ export default function RecruiterDashboard() {
 
     const getAverageScore = (testResponses: { score: number }[]) => {
         if (!testResponses || testResponses.length === 0) return 0;
-        return testResponses.reduce((acc, tr) => acc + tr.score, 0) / testResponses.length;
+        return Math.round(testResponses.reduce((acc, tr) => acc + tr.score, 0) / testResponses.length);
     };
 
     if (isLoading) {
@@ -157,7 +153,7 @@ export default function RecruiterDashboard() {
     }
 
     if (error) {
-        return <ErrorMessage message={error} onRetry={() => window.location.reload()} />;
+        return <ErrorMessage message={error} onRetry={fetchApplications} />;
     }
 
     const headerActions = (
@@ -247,42 +243,47 @@ export default function RecruiterDashboard() {
                         <h2 className="text-xl font-bold text-gray-800">最近の応募者</h2>
                         <Link
                             href="/applicants"
-                            className="text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+                            className="text-indigo-600 hover:text-indigo-700 text-sm font-medium flex items-center"
                         >
-                            すべて表示 →
+                            すべて表示
+                            <ArrowTrendingUpIcon className="w-4 h-4 ml-1" />
                         </Link>
                     </div>
                     <div className="space-y-4">
                         {recentApplicants.map((applicant) => (
                             <div
                                 key={applicant.id}
-                                className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 hover:shadow-lg transition-shadow duration-200"
+                                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
                             >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-4">
-                                        <div className="bg-white p-2 rounded-lg">
-                                            <BuildingOfficeIcon className="w-6 h-6 text-indigo-600" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-semibold text-gray-800">{applicant.name}</h3>
-                                            <p className="text-sm text-gray-600">{applicant.status}</p>
-                                        </div>
+                                <div className="flex items-center space-x-4">
+                                    <div className="bg-indigo-100 p-2 rounded-full">
+                                        <UserGroupIcon className="w-5 h-5 text-indigo-600" />
                                     </div>
-                                    <div className="flex items-center space-x-4">
-                                        <div className="text-right">
-                                            <p className="text-sm text-gray-600">応募日</p>
-                                            <p className="font-medium text-gray-800">{applicant.date}</p>
-                                        </div>
-                                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${applicant.status === "選考中"
+                                    <div>
+                                        <h3 className="font-medium text-gray-900">{applicant.name}</h3>
+                                        <p className="text-sm text-gray-500">
+                                            応募日: {new Date(applicant.date).toLocaleDateString('ja-JP')}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                    <div className="flex items-center space-x-2">
+                                        <ChartBarIcon className="w-4 h-4 text-indigo-600" />
+                                        <span className="text-sm font-medium text-indigo-600">
+                                            スコア: {applicant.score}
+                                        </span>
+                                    </div>
+                                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${applicant.status === 'pending'
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : applicant.status === 'interview_scheduled'
                                             ? 'bg-blue-100 text-blue-800'
                                             : 'bg-gray-100 text-gray-800'
-                                            }`}>
-                                            {applicant.status}
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm text-gray-600">スコア</p>
-                                            <p className="font-medium text-gray-800">{applicant.score}</p>
-                                        </div>
+                                        }`}>
+                                        {applicant.status === 'pending'
+                                            ? '未レビュー'
+                                            : applicant.status === 'interview_scheduled'
+                                                ? '面接予定'
+                                                : 'その他'}
                                     </div>
                                 </div>
                             </div>
