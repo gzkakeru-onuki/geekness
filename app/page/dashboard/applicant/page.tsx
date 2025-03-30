@@ -28,6 +28,14 @@ interface RecentNotification {
     type: "interview" | "application" | "profile";
 }
 
+interface CompanyApplication {
+    id: string;
+    companyName: string;
+    position: string;
+    status: "pending" | "reviewing" | "interview" | "rejected" | "accepted";
+    lastUpdated: string;
+}
+
 export default function ApplicantDashboardPage() {
     const { user } = useAuth();
     const [isLoading, setIsLoading] = useState(true);
@@ -39,6 +47,7 @@ export default function ApplicantDashboardPage() {
         completedInterviews: 0
     });
     const [recentNotifications, setRecentNotifications] = useState<RecentNotification[]>([]);
+    const [applications, setApplications] = useState<CompanyApplication[]>([]);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -52,6 +61,30 @@ export default function ApplicantDashboardPage() {
                     upcomingInterviews: 2,
                     completedInterviews: 1
                 });
+
+                setApplications([
+                    {
+                        id: "1",
+                        companyName: "株式会社〇〇",
+                        position: "フロントエンドエンジニア",
+                        status: "interview",
+                        lastUpdated: "2024-03-15"
+                    },
+                    {
+                        id: "2",
+                        companyName: "株式会社△△",
+                        position: "バックエンドエンジニア",
+                        status: "reviewing",
+                        lastUpdated: "2024-03-14"
+                    },
+                    {
+                        id: "3",
+                        companyName: "株式会社□□",
+                        position: "フルスタックエンジニア",
+                        status: "pending",
+                        lastUpdated: "2024-03-13"
+                    }
+                ]);
 
                 setRecentNotifications([
                     {
@@ -98,6 +131,36 @@ export default function ApplicantDashboardPage() {
             </div>
         );
     }
+
+    const getStatusColor = (status: CompanyApplication["status"]) => {
+        switch (status) {
+            case "pending":
+                return "bg-gray-100 text-gray-800";
+            case "reviewing":
+                return "bg-yellow-100 text-yellow-800";
+            case "interview":
+                return "bg-blue-100 text-blue-800";
+            case "rejected":
+                return "bg-red-100 text-red-800";
+            case "accepted":
+                return "bg-green-100 text-green-800";
+        }
+    };
+
+    const getStatusLabel = (status: CompanyApplication["status"]) => {
+        switch (status) {
+            case "pending":
+                return "応募済み";
+            case "reviewing":
+                return "審査中";
+            case "interview":
+                return "面接中";
+            case "rejected":
+                return "不採用";
+            case "accepted":
+                return "採用";
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
@@ -240,6 +303,49 @@ export default function ApplicantDashboardPage() {
                                     現在、予定されている面接はありません。
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* 応募中の企業 */}
+                <div className="mt-8">
+                    <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center space-x-2">
+                                <DocumentTextIcon className="w-5 h-5 text-gray-400" />
+                                <h2 className="text-lg font-medium text-gray-900">応募中の企業</h2>
+                            </div>
+                            <Link
+                                href="/page/applications"
+                                className="text-sm text-indigo-600 hover:text-indigo-700"
+                            >
+                                すべて表示
+                            </Link>
+                        </div>
+                        <div className="space-y-4">
+                            {applications.map((application) => (
+                                <div
+                                    key={application.id}
+                                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                                >
+                                    <div>
+                                        <div className="font-medium text-gray-900">
+                                            {application.companyName}
+                                        </div>
+                                        <div className="text-sm text-gray-500">
+                                            {application.position}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-4">
+                                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(application.status)}`}>
+                                            {getStatusLabel(application.status)}
+                                        </div>
+                                        <div className="text-sm text-gray-500">
+                                            {new Date(application.lastUpdated).toLocaleDateString('ja-JP')}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
