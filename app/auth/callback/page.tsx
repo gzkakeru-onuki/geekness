@@ -11,7 +11,7 @@ export default function ConfirmPage() {
             try {
                 const { error } = await supabase.auth.refreshSession();
                 if (!error) {
-                    router.push('/dashboard/profile');
+                    router.push('/');
                 }
             } catch (error) {
                 console.error('Error during confirmation:', error);

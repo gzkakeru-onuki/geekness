@@ -33,12 +33,12 @@ export default function InterviewDetailPage() {
 
     useEffect(() => {
         const fetchInterview = async () => {
-            if (!user) return;
+            if (!user || !params?.id) return;
 
             try {
                 // デモ用のデータ
                 const demoInterview: Interview = {
-                    id: params.id as string,
+                    id: Array.isArray(params.id) ? params.id[0] : params.id,
                     applicantName: "山田 太郎",
                     date: "2024-03-20",
                     time: "14:00",
@@ -55,7 +55,7 @@ export default function InterviewDetailPage() {
         };
 
         fetchInterview();
-    }, [user, params.id]);
+    }, [user, params?.id]);
 
     const handleStatusUpdate = async (newStatus: Interview["status"]) => {
         if (!user || !interview) return;

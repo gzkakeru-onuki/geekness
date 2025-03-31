@@ -1,206 +1,264 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "@/app/contexts/AuthContext";
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
-import {
-    UserGroupIcon,
-    DocumentTextIcon,
-    CalendarIcon,
-    ChartBarIcon,
-    BuildingOfficeIcon,
-    ArrowTrendingUpIcon,
-    CheckCircleIcon,
-    ClockIcon,
-    MagnifyingGlassIcon,
-    PlusIcon
-} from '@heroicons/react/24/outline';
+import { CalendarIcon, VideoCameraIcon, BuildingOfficeIcon, ClockIcon, UserIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import Link from "next/link";
 
 interface Interview {
     id: string;
     applicantName: string;
+    position: string;
     date: string;
     time: string;
-    type: string;
-    status: string;
+    type: 'online' | 'offline';
+    location?: string;
+    status: 'scheduled' | 'completed' | 'cancelled';
+    interviewer?: string;
+    notes?: string;
+    applicantId: string;
 }
 
-// デフォルトの面接データ
-const defaultInterviews: Interview[] = [
-    {
-        id: "1",
-        applicantName: "山田 太郎",
-        date: "2024-03-25",
-        time: "10:00",
-        type: "一次面接",
-        status: "scheduled"
-    },
-    {
-        id: "2",
-        applicantName: "鈴木 花子",
-        date: "2024-03-25",
-        time: "14:00",
-        type: "二次面接",
-        status: "scheduled"
-    },
-    {
-        id: "3",
-        applicantName: "佐藤 一郎",
-        date: "2024-03-26",
-        time: "11:00",
-        type: "最終面接",
-        status: "completed"
-    },
-    {
-        id: "4",
-        applicantName: "田中 美咲",
-        date: "2024-03-26",
-        time: "15:00",
-        type: "一次面接",
-        status: "cancelled"
-    }
-];
-
 export default function RecruiterInterviewsPage() {
-    const { user } = useAuth();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [interviews, setInterviews] = useState<Interview[]>([]);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState<string>("all");
-
-    const fetchInterviews = useCallback(async () => {
-        if (!user) {
-            setError("ログインが必要です。");
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            // デフォルトデータを使用
-            setInterviews(defaultInterviews);
-        } catch (error) {
-            console.error('Error fetching interviews:', error);
-            setError("面接データの取得中にエラーが発生しました。");
-        } finally {
-            setIsLoading(false);
-        }
-    }, [user]);
+    const [filter, setFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
 
     useEffect(() => {
+        const fetchInterviews = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+
+                // TODO: APIから面接データを取得
+                // 仮のデータ
+                const mockInterviews: Interview[] = [
+                    {
+                        id: "1",
+                        applicantName: "山田 太郎",
+                        position: "シニアフロントエンドエンジニア",
+                        date: "2024-03-20",
+                        time: "14:00",
+                        type: "online",
+                        status: "scheduled",
+                        interviewer: "鈴木 花子",
+                        notes: "Zoomを使用したオンライン面接です。",
+                        applicantId: "applicant1"
+                    },
+                    {
+                        id: "2",
+                        applicantName: "佐藤 一郎",
+                        position: "バックエンドエンジニア",
+                        date: "2024-03-15",
+                        time: "15:30",
+                        type: "offline",
+                        location: "東京都渋谷区〇〇ビル 5F",
+                        status: "completed",
+                        interviewer: "田中 次郎",
+                        notes: "技術面接が行われます。",
+                        applicantId: "applicant2"
+                    }
+                ];
+
+                setInterviews(mockInterviews);
+            } catch (error) {
+                console.error('Error fetching interviews:', error);
+                setError("面接情報の取得中にエラーが発生しました。");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
         fetchInterviews();
-    }, [fetchInterviews]);
+    }, []);
 
-    const filteredInterviews = interviews.filter(interview => {
-        const matchesSearch = interview.applicantName.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === "all" || interview.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    const getStatusColor = (status: Interview['status']) => {
+        switch (status) {
+            case 'scheduled':
+                return 'bg-blue-100 text-blue-800';
+            case 'completed':
+                return 'bg-green-100 text-green-800';
+            case 'cancelled':
+                return 'bg-red-100 text-red-800';
+            default:
+                return 'bg-gray-100 text-gray-800';
+        }
+    };
 
-    if (isLoading) {
-        return <LoadingSpinner />;
-    }
+    const getStatusText = (status: Interview['status']) => {
+        switch (status) {
+            case 'scheduled':
+                return '予定';
+            case 'completed':
+                return '完了';
+            case 'cancelled':
+                return 'キャンセル';
+            default:
+                return '不明';
+        }
+    };
+
+    const filteredInterviews = interviews.filter(interview =>
+        filter === 'all' || interview.status === filter
+    );
 
     if (error) {
-        return <ErrorMessage message={error} onRetry={fetchInterviews} />;
+        return <ErrorMessage message={error} />;
     }
 
-    const headerActions = (
-        <div className="flex items-center space-x-4">
-            <Link
-                href="/page/dashboard/recruiter/interviews/new"
-                className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
-            >
-                <PlusIcon className="w-5 h-5" />
-                <span>面接スケジュール作成</span>
-            </Link>
-        </div>
-    );
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <LoadingSpinner />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
             <PageHeader
                 title="面接スケジュール"
-                subtitle="面接のスケジュールを管理できます"
-                actions={headerActions}
+                subtitle="すべての面接スケジュールを管理できます"
                 showBackButton
                 backUrl="/page/dashboard/recruiter"
-                className="bg-white/80 backdrop-blur-lg border-b border-gray-200"
+                actions={
+                    <Link
+                        href="/page/dashboard/recruiter/interviews/new"
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                        <CalendarIcon className="w-5 h-5 mr-2" />
+                        新規面接をスケジュール
+                    </Link>
+                }
             />
 
-            <main className="max-w-7xl mx-auto p-6">
-                {/* フィルターと検索 */}
-                <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6 mb-8">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1">
-                            <div className="relative">
-                                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="応募者名で検索..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex space-x-4">
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            >
-                                <option value="all">すべてのステータス</option>
-                                <option value="scheduled">予定済み</option>
-                                <option value="completed">完了</option>
-                                <option value="cancelled">キャンセル</option>
-                            </select>
-                        </div>
-                    </div>
+            <main className="max-w-4xl mx-auto p-6">
+                {/* フィルター */}
+                <div className="mb-6 flex space-x-4">
+                    <button
+                        onClick={() => setFilter('all')}
+                        className={`px-4 py-2 rounded-lg ${filter === 'all'
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        すべて
+                    </button>
+                    <button
+                        onClick={() => setFilter('scheduled')}
+                        className={`px-4 py-2 rounded-lg ${filter === 'scheduled'
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        予定
+                    </button>
+                    <button
+                        onClick={() => setFilter('completed')}
+                        className={`px-4 py-2 rounded-lg ${filter === 'completed'
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        完了
+                    </button>
+                    <button
+                        onClick={() => setFilter('cancelled')}
+                        className={`px-4 py-2 rounded-lg ${filter === 'cancelled'
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        キャンセル
+                    </button>
                 </div>
 
                 {/* 面接一覧 */}
-                <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
-                    <div className="space-y-4">
-                        {filteredInterviews.map((interview) => (
+                <div className="space-y-4">
+                    {filteredInterviews.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                            面接スケジュールはありません
+                        </div>
+                    ) : (
+                        filteredInterviews.map((interview) => (
                             <div
                                 key={interview.id}
-                                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+                                className="bg-white rounded-xl shadow-sm p-6"
                             >
-                                <div className="flex items-center space-x-4">
-                                    <div className="bg-indigo-100 p-2 rounded-full">
-                                        <CalendarIcon className="w-5 h-5 text-indigo-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-medium text-gray-900">{interview.applicantName}</h3>
-                                        <div className="flex items-center space-x-2 text-sm text-gray-500">
-                                            <span>{new Date(interview.date).toLocaleDateString('ja-JP')}</span>
-                                            <span>•</span>
-                                            <span>{interview.time}</span>
-                                            <span>•</span>
-                                            <span>{interview.type}</span>
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center space-x-2">
+                                            <UserIcon className="w-5 h-5 text-gray-400" />
+                                            <h3 className="text-lg font-medium text-gray-900">
+                                                {interview.applicantName}
+                                            </h3>
                                         </div>
+                                        <p className="mt-1 text-gray-600">
+                                            {interview.position}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(interview.status)}`}>
+                                            {getStatusText(interview.status)}
+                                        </span>
+                                        <Link
+                                            href={`/page/dashboard/recruiter/interviews/${interview.id}`}
+                                            className="p-2 text-gray-400 hover:text-indigo-600"
+                                        >
+                                            <PencilSquareIcon className="w-5 h-5" />
+                                        </Link>
                                     </div>
                                 </div>
-                                <div className={`px-3 py-1 rounded-full text-sm font-medium ${interview.status === 'scheduled'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : interview.status === 'completed'
-                                        ? 'bg-green-100 text-green-800'
-                                        : 'bg-red-100 text-red-800'
-                                    }`}>
-                                    {interview.status === 'scheduled'
-                                        ? '予定済み'
-                                        : interview.status === 'completed'
-                                            ? '完了'
-                                            : 'キャンセル'}
+
+                                <div className="mt-4 grid grid-cols-2 gap-4">
+                                    <div className="flex items-center space-x-2">
+                                        <CalendarIcon className="w-5 h-5 text-gray-400" />
+                                        <span className="text-gray-600">
+                                            {new Date(interview.date).toLocaleDateString('ja-JP')}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <ClockIcon className="w-5 h-5 text-gray-400" />
+                                        <span className="text-gray-600">
+                                            {interview.time}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        {interview.type === 'online' ? (
+                                            <VideoCameraIcon className="w-5 h-5 text-gray-400" />
+                                        ) : (
+                                            <BuildingOfficeIcon className="w-5 h-5 text-gray-400" />
+                                        )}
+                                        <span className="text-gray-600">
+                                            {interview.type === 'online' ? 'オンライン面接' : '対面面接'}
+                                        </span>
+                                    </div>
+                                    {interview.location && (
+                                        <div className="flex items-center space-x-2">
+                                            <BuildingOfficeIcon className="w-5 h-5 text-gray-400" />
+                                            <span className="text-gray-600">
+                                                {interview.location}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {interview.interviewer && (
+                                    <div className="mt-4 text-sm text-gray-600">
+                                        面接官: {interview.interviewer}
+                                    </div>
+                                )}
+
+                                {interview.notes && (
+                                    <div className="mt-4 text-sm text-gray-600">
+                                        備考: {interview.notes}
+                                    </div>
+                                )}
                             </div>
-                        ))}
-                    </div>
+                        ))
+                    )}
                 </div>
             </main>
         </div>

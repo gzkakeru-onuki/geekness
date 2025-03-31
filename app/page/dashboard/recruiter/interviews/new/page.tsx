@@ -180,7 +180,7 @@ export default function NewInterviewPage() {
                             >
                                 {isLoading ? (
                                     <>
-                                        <LoadingSpinner className="w-5 h-5 mr-2" />
+                                        <LoadingSpinner />
                                         作成中...
                                     </>
                                 ) : (

@@ -39,6 +39,7 @@ export default function Register() {
             });
 
             if (authError) throw authError;
+            console.log("エラー内容：",authError);
 
             // 2. プロフィールを作成
             const { error: profileError } = await supabase

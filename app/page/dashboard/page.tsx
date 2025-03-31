@@ -136,7 +136,7 @@ function DashboardContent() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
                         {userType === "applicant" ? (
                             <>
-                                <Link href="/page/applicant" className="block focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-xl">
+                                <Link href="/page/dashboard/applicant" className="block focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-xl">
                                     <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 hover:shadow-lg transition-all duration-300 group">
                                         <h2 className="text-xl font-semibold text-gray-800 mb-4 group-hover:text-indigo-600">応募中の求人一覧</h2>
                                         <p className="text-gray-600 mb-4">現在応募中の求人を確認できます。</p>

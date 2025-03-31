@@ -10,8 +10,11 @@ import {
     CalendarIcon,
     BellIcon,
     DocumentTextIcon,
-    PencilSquareIcon
+    PencilSquareIcon,
+    Cog6ToothIcon,
+    ArrowLeftOnRectangleIcon
 } from '@heroicons/react/24/outline';
+import { useRouter } from "next/navigation";
 
 interface DashboardStats {
     totalApplications: number;
@@ -37,7 +40,8 @@ interface CompanyApplication {
 }
 
 export default function ApplicantDashboardPage() {
-    const { user } = useAuth();
+    const { user, signOut } = useAuth();
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [stats, setStats] = useState<DashboardStats>({
@@ -120,6 +124,18 @@ export default function ApplicantDashboardPage() {
         fetchDashboardData();
     }, [user]);
 
+    const handleSignOut = async () => {
+        try {
+            const confirmed = confirm("ログアウトしますか？");
+            if (confirmed) {
+                await signOut();
+                router.push("/");
+            }
+        } catch (error) {
+            console.error("Error signing out:", error);
+        }
+    };
+
     if (error) {
         return <ErrorMessage message={error} />;
     }
@@ -163,21 +179,36 @@ export default function ApplicantDashboardPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
             <PageHeader
                 title="応募者ダッシュボード"
-                subtitle="あなたの応募状況と面接スケジュールを管理します"
+                subtitle="あなたの求人応募状況を確認できます"
                 showBackButton
                 backUrl="/page/dashboard"
-                className="bg-white/80 backdrop-blur-lg border-b border-gray-200"
                 actions={
-                    <Link
-                        href="/page/dashboard/profile"
-                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                        <PencilSquareIcon className="w-5 h-5 mr-2" />
-                        プロフィールを編集
-                    </Link>
+                    <div className="flex items-center space-x-4">
+                        <Link
+                            href="/page/dashboard/applicant/profile"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                            <UserCircleIcon className="h-5 w-5 mr-2" />
+                            プロフィール
+                        </Link>
+                        <Link
+                            href="/page/dashboard/applicant/settings"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                        >
+                            <Cog6ToothIcon className="h-5 w-5 mr-2" />
+                            設定
+                        </Link>
+                        <button
+                            onClick={handleSignOut}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        >
+                            <ArrowLeftOnRectangleIcon className="h-5 w-5 mr-2" />
+                            ログアウト
+                        </button>
+                    </div>
                 }
             />
 
@@ -316,7 +347,7 @@ export default function ApplicantDashboardPage() {
                                 <h2 className="text-lg font-medium text-gray-900">応募中の企業</h2>
                             </div>
                             <Link
-                                href="/page/applications"
+                                href="/page/dashboard/applicant/applications"
                                 className="text-sm text-indigo-600 hover:text-indigo-700"
                             >
                                 すべて表示

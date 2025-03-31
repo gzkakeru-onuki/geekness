@@ -1,8 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/app/utils/supabase";
-import { useAuth } from "@/app/contexts/AuthContext";
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
@@ -11,36 +8,49 @@ import {
     DocumentTextIcon,
     CalendarIcon,
     ChartBarIcon,
-    BuildingOfficeIcon,
-    ArrowTrendingUpIcon,
-    CheckCircleIcon,
-    ClockIcon
+    BellIcon,
+    ArrowRightIcon,
+    ClockIcon,
+    MapPinIcon,
+    UserCircleIcon,
+    Cog6ToothIcon,
+    ArrowLeftOnRectangleIcon
 } from '@heroicons/react/24/outline';
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/app/contexts/AuthContext";
 
-interface Application {
+interface Notification {
     id: string;
-    status: string;
-    applied_at: string;
-    applicant_id: {
-        id: string;
-        applicant_lastname: string;
-        applicant_firstname: string;
-        test_responses: {
-            score: number;
-        }[];
-    };
+    type: 'application' | 'interview' | 'test' | 'system';
+    title: string;
+    content: string;
+    date: string;
+    isRead: boolean;
+    applicantName?: string;
 }
 
 interface RecentApplicant {
     id: string;
     name: string;
-    score: number;
+    position: string;
+    appliedDate: string;
     status: string;
+}
+
+interface UpcomingInterview {
+    id: string;
+    applicantName: string;
+    position: string;
     date: string;
+    time: string;
+    type: 'online' | 'offline';
+    location?: string;
 }
 
 export default function RecruiterDashboard() {
-    const { user } = useAuth();
+    const { user, signOut } = useAuth();
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [stats, setStats] = useState({
@@ -49,150 +59,178 @@ export default function RecruiterDashboard() {
         upcomingInterviews: 0,
         averageScore: 0
     });
-
-    const [applications, setApplications] = useState<Application[]>([]);
     const [recentApplicants, setRecentApplicants] = useState<RecentApplicant[]>([]);
-
-    const fetchApplications = useCallback(async () => {
-        if (!user) {
-            setError("ログインが必要です。");
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            // 企業プロフィールの取得
-            const { data: recruiterProfile, error: recruiterError } = await supabase
-                .from('recruiter_profiles')
-                .select('company_id')
-                .eq('id', user.id)
-                .single();
-
-            if (recruiterError) throw recruiterError;
-            if (!recruiterProfile) {
-                setError("企業プロフィールが見つかりません。");
-                return;
-            }
-
-            // 応募データの取得
-            const { data: applicationsData, error: applicationsError } = await supabase
-                .from('applications')
-                .select(`
-                    id,
-                    status,
-                    applied_at,
-                    applicant_id (
-                        id,
-                        applicant_lastname,
-                        applicant_firstname,
-                        test_responses (
-                            score
-                        )
-                    )
-                `)
-                .eq('company_id', recruiterProfile.company_id)
-                .order('applied_at', { ascending: false });
-
-            if (applicationsError) throw applicationsError;
-
-            // 応募者数の取得
-            const { count: totalApplicants, error: countError } = await supabase
-                .from('applications')
-                .select('*', { count: 'exact' })
-                .eq('company_id', recruiterProfile.company_id);
-
-            if (countError) throw countError;
-
-            // データの整形
-            const formattedApplications = (applicationsData || []) as unknown as Application[];
-            setApplications(formattedApplications);
-
-            const recent = formattedApplications.map((app) => ({
-                id: app.id,
-                name: `${app.applicant_id?.applicant_lastname || ''} ${app.applicant_id?.applicant_firstname || ''}`,
-                score: getAverageScore(app.applicant_id?.test_responses || []),
-                status: app.status,
-                date: app.applied_at
-            }));
-            setRecentApplicants(recent);
-
-            // 統計情報の計算
-            const totalScore = recent.reduce((sum, applicant) => sum + applicant.score, 0);
-            const applicantsWithScore = recent.filter(app => app.score > 0).length;
-            const overallAverageScore = applicantsWithScore > 0
-                ? Math.round(totalScore / applicantsWithScore)
-                : 0;
-
-            setStats({
-                totalApplicants: totalApplicants || 0,
-                pendingReviews: formattedApplications.filter(app => app.status === 'pending').length,
-                upcomingInterviews: formattedApplications.filter(app => app.status === 'interview_scheduled').length,
-                averageScore: overallAverageScore
-            });
-        } catch (error) {
-            console.error('Error fetching data:', error);
-            setError("データの取得中にエラーが発生しました。");
-        } finally {
-            setIsLoading(false);
-        }
-    }, [user]);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [upcomingInterviews, setUpcomingInterviews] = useState<UpcomingInterview[]>([]);
 
     useEffect(() => {
-        fetchApplications();
-    }, [fetchApplications]);
+        const fetchDashboardData = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
 
-    const getAverageScore = (testResponses: { score: number }[]) => {
-        if (!testResponses || testResponses.length === 0) return 0;
-        return Math.round(testResponses.reduce((acc, tr) => acc + tr.score, 0) / testResponses.length);
+                // ダミーデータ
+                setStats({
+                    totalApplicants: 45,
+                    pendingReviews: 12,
+                    upcomingInterviews: 5,
+                    averageScore: 85
+                });
+
+                setRecentApplicants([
+                    {
+                        id: "1",
+                        name: "山田 太郎",
+                        position: "シニアフロントエンドエンジニア",
+                        appliedDate: "2024-03-15",
+                        status: "interview"
+                    },
+                    {
+                        id: "2",
+                        name: "佐藤 一郎",
+                        position: "バックエンドエンジニア",
+                        appliedDate: "2024-03-14",
+                        status: "reviewing"
+                    }
+                ]);
+
+                // ダミーの今後の面接データ
+                setUpcomingInterviews([
+                    {
+                        id: "1",
+                        applicantName: "山田 太郎",
+                        position: "シニアフロントエンドエンジニア",
+                        date: "2024-03-20",
+                        time: "14:00",
+                        type: "online",
+                        location: "Zoom"
+                    },
+                    {
+                        id: "2",
+                        applicantName: "鈴木 花子",
+                        position: "フロントエンドエンジニア",
+                        date: "2024-03-21",
+                        time: "15:30",
+                        type: "offline",
+                        location: "本社オフィス 3F 会議室A"
+                    }
+                ]);
+
+                // ダミーの通知データ
+                setNotifications([
+                    {
+                        id: "1",
+                        type: "application",
+                        title: "新規応募",
+                        content: "シニアフロントエンドエンジニアのポジションに新規応募がありました",
+                        date: "2024-03-15T10:30:00",
+                        isRead: false,
+                        applicantName: "山田 太郎"
+                    },
+                    {
+                        id: "2",
+                        type: "interview",
+                        title: "面接スケジュール",
+                        content: "明日の面接スケジュールが確定しました",
+                        date: "2024-03-15T09:00:00",
+                        isRead: true,
+                        applicantName: "佐藤 一郎"
+                    },
+                    {
+                        id: "3",
+                        type: "test",
+                        title: "テスト結果",
+                        content: "技術テストの採点が完了しました",
+                        date: "2024-03-14T15:45:00",
+                        isRead: false,
+                        applicantName: "鈴木 花子"
+                    },
+                    {
+                        id: "4",
+                        type: "system",
+                        title: "システムメンテナンス",
+                        content: "システムの定期メンテナンスを実施します",
+                        date: "2024-03-14T14:00:00",
+                        isRead: true
+                    }
+                ]);
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+                setError("データの取得中にエラーが発生しました。");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchDashboardData();
+    }, []);
+
+    const handleSignOut = async () => {
+        try {
+            const confirmed = confirm("ログアウトしますか？");
+            if (confirmed) {
+                await signOut();
+                router.push("/");
+            }
+        } catch (error) {
+            console.error("Error signing out:", error);
+        }
     };
 
-    if (isLoading) {
-        return <LoadingSpinner />;
-    }
-
     if (error) {
-        return <ErrorMessage message={error} onRetry={fetchApplications} />;
+        return <ErrorMessage message={error} />;
     }
 
-    const headerActions = (
-        <div className="flex items-center space-x-4">
-            <Link
-                href="/dashboard/recruiter/interviews"
-                className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
-            >
-                <CalendarIcon className="w-5 h-5" />
-                <span>面接スケジュール</span>
-            </Link>
-            <Link
-                href="/dashboard/recruiter/jobs/new"
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200"
-            >
-                <DocumentTextIcon className="w-5 h-5" />
-                <span>新規求人作成</span>
-            </Link>
-        </div>
-    );
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <LoadingSpinner />
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
             <PageHeader
-                title="採用担当者ダッシュボード"
-                subtitle="応募者の状況を確認・管理できます"
-                actions={headerActions}
+                title="採用者ダッシュボード"
+                subtitle="求人応募状況と面接スケジュールを管理します"
                 showBackButton
-                className="bg-white/80 backdrop-blur-lg border-b border-gray-200"
+                backUrl="/page/dashboard"
+                actions={
+                    <div className="flex items-center space-x-4">
+                        <Link
+                            href="/page/dashboard/recruiter/profile"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                            <UserCircleIcon className="h-5 w-5 mr-2" />
+                            プロフィール
+                        </Link>
+                        <Link
+                            href="/page/dashboard/recruiter/settings"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                        >
+                            <Cog6ToothIcon className="h-5 w-5 mr-2" />
+                            設定
+                        </Link>
+                        <button
+                            onClick={handleSignOut}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        >
+                            <ArrowLeftOnRectangleIcon className="h-5 w-5 mr-2" />
+                            ログアウト
+                        </button>
+                    </div>
+                }
             />
 
             <main className="max-w-7xl mx-auto p-6">
                 {/* 統計情報 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                    <div className="bg-white rounded-xl shadow-sm p-6">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-600">総応募者数</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalApplicants}</p>
+                                <p className="text-2xl font-semibold text-gray-900 mt-1">{stats.totalApplicants}</p>
                             </div>
                             <div className="bg-indigo-100 p-3 rounded-full">
                                 <UserGroupIcon className="w-6 h-6 text-indigo-600" />
@@ -200,35 +238,35 @@ export default function RecruiterDashboard() {
                         </div>
                     </div>
 
-                    <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                    <div className="bg-white rounded-xl shadow-sm p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-gray-600">未レビュー数</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.pendingReviews}</p>
+                                <p className="text-sm font-medium text-gray-600">未レビュー</p>
+                                <p className="text-2xl font-semibold text-gray-900 mt-1">{stats.pendingReviews}</p>
                             </div>
-                            <div className="bg-purple-100 p-3 rounded-full">
-                                <DocumentTextIcon className="w-6 h-6 text-purple-600" />
+                            <div className="bg-yellow-100 p-3 rounded-full">
+                                <DocumentTextIcon className="w-6 h-6 text-yellow-600" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                    <div className="bg-white rounded-xl shadow-sm p-6">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-600">今後の面接</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.upcomingInterviews}</p>
+                                <p className="text-2xl font-semibold text-gray-900 mt-1">{stats.upcomingInterviews}</p>
                             </div>
-                            <div className="bg-pink-100 p-3 rounded-full">
-                                <CalendarIcon className="w-6 h-6 text-pink-600" />
+                            <div className="bg-blue-100 p-3 rounded-full">
+                                <CalendarIcon className="w-6 h-6 text-blue-600" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                    <div className="bg-white rounded-xl shadow-sm p-6">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-600">平均スコア</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.averageScore}</p>
+                                <p className="text-2xl font-semibold text-gray-900 mt-1">{stats.averageScore}</p>
                             </div>
                             <div className="bg-green-100 p-3 rounded-full">
                                 <ChartBarIcon className="w-6 h-6 text-green-600" />
@@ -237,57 +275,138 @@ export default function RecruiterDashboard() {
                     </div>
                 </div>
 
-                {/* 最近の応募者 */}
-                <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold text-gray-800">最近の応募者</h2>
-                        <Link
-                            href="/page/dashboard/recruiter/applicants"
-                            className="text-indigo-600 hover:text-indigo-700 text-sm font-medium flex items-center"
-                        >
-                            すべて表示
-                            <ArrowTrendingUpIcon className="w-4 h-4 ml-1" />
-                        </Link>
-                    </div>
-                    <div className="space-y-4">
-                        {recentApplicants.map((applicant) => (
-                            <div
-                                key={applicant.id}
-                                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* 最近の応募者 */}
+                    <div className="bg-white rounded-xl shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-medium text-gray-900">最近の応募者</h2>
+                            <Link
+                                href="/page/dashboard/recruiter/applicants"
+                                className="text-sm text-indigo-600 hover:text-indigo-800"
                             >
-                                <div className="flex items-center space-x-4">
-                                    <div className="bg-indigo-100 p-2 rounded-full">
-                                        <UserGroupIcon className="w-5 h-5 text-indigo-600" />
-                                    </div>
+                                すべて表示
+                            </Link>
+                        </div>
+                        <div className="space-y-4">
+                            {recentApplicants.map((applicant) => (
+                                <div
+                                    key={applicant.id}
+                                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                                >
                                     <div>
                                         <h3 className="font-medium text-gray-900">{applicant.name}</h3>
-                                        <p className="text-sm text-gray-500">
-                                            応募日: {new Date(applicant.date).toLocaleDateString('ja-JP')}
+                                        <p className="text-sm text-gray-500">{applicant.position}</p>
+                                    </div>
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${applicant.status === 'interview'
+                                        ? 'bg-purple-100 text-purple-800'
+                                        : 'bg-yellow-100 text-yellow-800'
+                                        }`}>
+                                        {applicant.status === 'interview' ? '面接中' : '審査中'}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 今後の面接 */}
+                    <div className="bg-white rounded-xl shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-medium text-gray-900">今後の面接</h2>
+                            <Link
+                                href="/page/dashboard/recruiter/interviews"
+                                className="text-sm text-indigo-600 hover:text-indigo-800"
+                            >
+                                すべて表示
+                            </Link>
+                        </div>
+                        <div className="space-y-4">
+                            {upcomingInterviews.map((interview) => (
+                                <div
+                                    key={interview.id}
+                                    className="p-4 bg-gray-50 rounded-lg"
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="font-medium text-gray-900">{interview.applicantName}</h3>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${interview.type === 'online'
+                                            ? 'bg-blue-100 text-blue-800'
+                                            : 'bg-green-100 text-green-800'
+                                            }`}>
+                                            {interview.type === 'online' ? 'オンライン' : '対面'}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 mb-2">{interview.position}</p>
+                                    <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                        <div className="flex items-center">
+                                            <CalendarIcon className="w-4 h-4 mr-1" />
+                                            {new Date(interview.date).toLocaleDateString('ja-JP')}
+                                        </div>
+                                        <div className="flex items-center">
+                                            <ClockIcon className="w-4 h-4 mr-1" />
+                                            {interview.time}
+                                        </div>
+                                        {interview.location && (
+                                            <div className="flex items-center">
+                                                <MapPinIcon className="w-4 h-4 mr-1" />
+                                                {interview.location}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 通知 */}
+                    <div className="bg-white rounded-xl shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-medium text-gray-900">通知</h2>
+                            <Link
+                                href="/page/dashboard/recruiter/notifications"
+                                className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
+                            >
+                                すべての通知を表示
+                                <ArrowRightIcon className="w-4 h-4 ml-1" />
+                            </Link>
+                        </div>
+                        <div className="space-y-4">
+                            {notifications.map((notification) => (
+                                <div
+                                    key={notification.id}
+                                    className={`flex items-start space-x-4 p-4 rounded-lg ${notification.isRead ? 'bg-gray-50' : 'bg-blue-50'
+                                        }`}
+                                >
+                                    <div className={`p-2 rounded-full ${notification.type === 'application'
+                                        ? 'bg-indigo-100'
+                                        : notification.type === 'interview'
+                                            ? 'bg-purple-100'
+                                            : notification.type === 'test'
+                                                ? 'bg-green-100'
+                                                : 'bg-gray-100'
+                                        }`}>
+                                        <BellIcon className={`w-5 h-5 ${notification.type === 'application'
+                                            ? 'text-indigo-600'
+                                            : notification.type === 'interview'
+                                                ? 'text-purple-600'
+                                                : notification.type === 'test'
+                                                    ? 'text-green-600'
+                                                    : 'text-gray-600'
+                                            }`} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-medium text-gray-900">{notification.title}</h3>
+                                        <p className="text-sm text-gray-600 mt-1">{notification.content}</p>
+                                        {notification.applicantName && (
+                                            <p className="text-sm text-gray-500 mt-1">
+                                                対象者: {notification.applicantName}
+                                            </p>
+                                        )}
+                                        <p className="text-xs text-gray-400 mt-2">
+                                            {new Date(notification.date).toLocaleString('ja-JP')}
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center space-x-4">
-                                    <div className="flex items-center space-x-2">
-                                        <ChartBarIcon className="w-4 h-4 text-indigo-600" />
-                                        <span className="text-sm font-medium text-indigo-600">
-                                            スコア: {applicant.score}
-                                        </span>
-                                    </div>
-                                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${applicant.status === 'pending'
-                                        ? 'bg-yellow-100 text-yellow-800'
-                                        : applicant.status === 'interview_scheduled'
-                                            ? 'bg-blue-100 text-blue-800'
-                                            : 'bg-gray-100 text-gray-800'
-                                        }`}>
-                                        {applicant.status === 'pending'
-                                            ? '未レビュー'
-                                            : applicant.status === 'interview_scheduled'
-                                                ? '面接予定'
-                                                : 'その他'}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </div>
             </main>
