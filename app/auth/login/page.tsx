@@ -11,67 +11,83 @@ export default function Login() {
     const [activeTab, setActiveTab] = useState("user");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [error, setError] = useState<string | null>(null);
     const router = useRouter();
 
     const handleLogin = async (e: FormEvent, userType: string) => {
         e.preventDefault();
+        setError(null);
+
         try {
             // まずAuthでログイン
-            const { data, error } = await supabase.auth.signInWithPassword({
+            const { data, error: authError } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
 
-            if (error) {
-                console.error("Login error:", error);
-                alert("送信されたメールを確認していないか、メールアドレスかパスワードが間違っています。");
+            if (authError) {
+                console.error("Login error:", authError);
+                setError("認証メールを確認していないか、メールアドレスまたはパスワードが正しくありません。");
                 return;
             }
 
-            if (!data.user) {
-                alert("ユーザー情報の取得に失敗しました");
+            if (!data?.user) {
+                setError("ユーザー情報の取得に失敗しました。");
                 return;
             }
 
             // applicant_profilesをチェック
-            const { data: applicantProfile } = await supabase
+            const { data: applicantProfile, error: applicantError } = await supabase
                 .from('applicant_profiles')
                 .select('id')
                 .eq('id', data.user.id)
                 .maybeSingle();
 
+            if (applicantError) {
+                console.error("Applicant profile error:", applicantError);
+                setError("プロフィール情報の取得に失敗しました。");
+                return;
+            }
+
             // recruiter_profilesをチェック
-            const { data: recruiterProfile } = await supabase
+            const { data: recruiterProfile, error: recruiterError } = await supabase
                 .from('recruiter_profiles')
                 .select('id')
                 .eq('id', data.user.id)
                 .maybeSingle();
 
+            if (recruiterError) {
+                console.error("Recruiter profile error:", recruiterError);
+                setError("プロフィール情報の取得に失敗しました。");
+                return;
+            }
+
             // プロフィールの存在確認と適切な遷移
             if (applicantProfile) {
                 if (userType === "applicant") {
-                    router.push("/page/dashboard?type=applicant");
+                    router.push("/page/dashboard/applicant");
                 } else {
-                    alert("このアカウントは採用希望者として登録されています。採用希望者タブからログインしてください。");
+                    setError("このアカウントは採用希望者として登録されています。採用希望者タブからログインしてください。");
                     await supabase.auth.signOut();
                 }
             } else if (recruiterProfile) {
                 if (userType === "recruiter") {
-                    router.push("/page/dashboard?type=recruiter");
+                    router.push("/page/dashboard/recruiter");
                 } else {
-                    alert("このアカウントは企業担当者として登録されています。企業担当者タブからログインしてください。");
+                    setError("このアカウントは企業担当者として登録されています。企業担当者タブからログインしてください。");
                     await supabase.auth.signOut();
                 }
             } else {
-                alert("プロフィール情報が見つかりません");
+                setError("プロフィール情報が見つかりません。");
                 await supabase.auth.signOut();
             }
 
         } catch (error) {
             console.error("Login process error:", error);
-            alert("ログイン処理中にエラーが発生しました");
+            setError("ログイン処理中にエラーが発生しました。");
         }
     };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-md mx-auto">
@@ -104,6 +120,12 @@ export default function Login() {
                         </button>
                     </div>
 
+                    {error && (
+                        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg">
+                            {error}
+                        </div>
+                    )}
+
                     {activeTab === "user" && (
                         <form onSubmit={(e) => handleLogin(e, "applicant")} className="space-y-6">
                             <div>
@@ -116,6 +138,7 @@ export default function Login() {
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
                                     placeholder="example@email.com"
+                                    required
                                 />
                             </div>
                             <div>
@@ -128,6 +151,7 @@ export default function Login() {
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
                                     placeholder="••••••••"
+                                    required
                                 />
                             </div>
                             <button
@@ -156,6 +180,7 @@ export default function Login() {
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
                                     placeholder="example@email.com"
+                                    required
                                 />
                             </div>
                             <div>
@@ -168,6 +193,7 @@ export default function Login() {
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
                                     placeholder="••••••••"
+                                    required
                                 />
                             </div>
                             <button
