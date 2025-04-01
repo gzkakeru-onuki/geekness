@@ -14,7 +14,9 @@ import {
     MapPinIcon,
     UserCircleIcon,
     Cog6ToothIcon,
-    ArrowLeftOnRectangleIcon
+    ArrowLeftOnRectangleIcon,
+    UserPlusIcon,
+    EnvelopeIcon
 } from '@heroicons/react/24/outline';
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -192,8 +194,8 @@ export default function RecruiterDashboard() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
             <PageHeader
-                title="採用者ダッシュボード"
-                subtitle="求人応募状況と面接スケジュールを管理します"
+                title="リクルーターダッシュボード"
+                subtitle="求人応募の管理と面接スケジュールの確認"
                 showBackButton
                 backUrl="/page/dashboard"
                 actions={
@@ -223,7 +225,7 @@ export default function RecruiterDashboard() {
                 }
             />
 
-            <main className="max-w-7xl mx-auto p-6">
+            <main className="max-w-7xl mx-auto p-6 mt-32">
                 {/* 統計情報 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div className="bg-white rounded-xl shadow-sm p-6">
@@ -276,24 +278,25 @@ export default function RecruiterDashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* 最近の応募者 */}
+                {/* 最近の応募者 */}
                     <div className="bg-white rounded-xl shadow-sm p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-medium text-gray-900">最近の応募者</h2>
                             <Link
                                 href="/page/dashboard/recruiter/applicants"
-                                className="text-sm text-indigo-600 hover:text-indigo-800"
+                                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                             >
                                 すべて表示
+                                <ArrowRightIcon className="ml-2 h-4 w-4" />
                             </Link>
-                        </div>
-                        <div className="space-y-4">
-                            {recentApplicants.map((applicant) => (
-                                <div
-                                    key={applicant.id}
+                    </div>
+                    <div className="space-y-4">
+                        {recentApplicants.map((applicant) => (
+                            <div
+                                key={applicant.id}
                                     className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                                >
-                                    <div>
+                            >
+                                        <div>
                                         <h3 className="font-medium text-gray-900">{applicant.name}</h3>
                                         <p className="text-sm text-gray-500">{applicant.position}</p>
                                     </div>
@@ -314,11 +317,12 @@ export default function RecruiterDashboard() {
                             <h2 className="text-lg font-medium text-gray-900">今後の面接</h2>
                             <Link
                                 href="/page/dashboard/recruiter/interviews"
-                                className="text-sm text-indigo-600 hover:text-indigo-800"
+                                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                             >
                                 すべて表示
+                                <ArrowRightIcon className="ml-2 h-4 w-4" />
                             </Link>
-                        </div>
+                                        </div>
                         <div className="space-y-4">
                             {upcomingInterviews.map((interview) => (
                                 <div
@@ -362,10 +366,10 @@ export default function RecruiterDashboard() {
                             <h2 className="text-lg font-medium text-gray-900">通知</h2>
                             <Link
                                 href="/page/dashboard/recruiter/notifications"
-                                className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
+                                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                             >
-                                すべての通知を表示
-                                <ArrowRightIcon className="w-4 h-4 ml-1" />
+                                すべて表示
+                                <ArrowRightIcon className="ml-2 h-4 w-4" />
                             </Link>
                         </div>
                         <div className="space-y-4">
@@ -406,6 +410,122 @@ export default function RecruiterDashboard() {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+
+                    {/* 受験者招待 */}
+                    <div className="bg-white rounded-xl shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-medium text-gray-900">受験者招待</h2>
+                            <Link
+                                href="/page/dashboard/recruiter/invite"
+                                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                            >
+                                招待する
+                                <ArrowRightIcon className="ml-2 h-4 w-4" />
+                            </Link>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <div className="font-medium text-gray-900">招待済み</div>
+                                    <div className="text-sm text-gray-500">5名</div>
+                                </div>
+                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                    未受験: 3名
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <div className="font-medium text-gray-900">受験済み</div>
+                                    <div className="text-sm text-gray-500">2名</div>
+                                </div>
+                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                    完了
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* テスト関連セクション */}
+                <div className="mt-12">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-6">テスト関連</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* スキルテスト作成 */}
+                        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center space-x-2">
+                                    <DocumentTextIcon className="w-5 h-5 text-gray-400" />
+                                    <h3 className="text-lg font-medium text-gray-900">スキルテスト</h3>
+                                </div>
+                                <Link
+                                    href="/page/dashboard/recruiter/skilltest/create"
+                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                                >
+                                    テストを作成
+                                    <ArrowRightIcon className="ml-2 h-4 w-4" />
+                                </Link>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div>
+                                        <div className="font-medium text-gray-900">技術テスト</div>
+                                        <div className="text-sm text-gray-500">問題数: 10問</div>
+                                    </div>
+                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                        編集可能
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div>
+                                        <div className="font-medium text-gray-900">適性テスト</div>
+                                        <div className="text-sm text-gray-500">問題数: 15問</div>
+                                    </div>
+                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                        公開中
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* テスト結果 */}
+                        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center space-x-2">
+                                    <ChartBarIcon className="w-5 h-5 text-gray-400" />
+                                    <h3 className="text-lg font-medium text-gray-900">テスト結果</h3>
+                                </div>
+                                <Link
+                                    href="/page/dashboard/recruiter/skilltest/result"
+                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                                >
+                                    すべて表示
+                                    <ArrowRightIcon className="ml-2 h-4 w-4" />
+                                </Link>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div>
+                                        <div className="font-medium text-gray-900">技術テスト</div>
+                                        <div className="text-sm text-gray-500">平均点: 85点</div>
+                                    </div>
+                                    <div className="flex items-center space-x-4">
+                                        <span className="text-lg font-semibold text-indigo-600">2名</span>
+                                        <span className="text-sm text-gray-500">受験済み</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div>
+                                        <div className="font-medium text-gray-900">適性テスト</div>
+                                        <div className="text-sm text-gray-500">平均点: 92点</div>
+                                    </div>
+                                    <div className="flex items-center space-x-4">
+                                        <span className="text-lg font-semibold text-indigo-600">2名</span>
+                                        <span className="text-sm text-gray-500">受験済み</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

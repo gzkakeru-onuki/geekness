@@ -12,7 +12,9 @@ import {
     DocumentTextIcon,
     PencilSquareIcon,
     Cog6ToothIcon,
-    ArrowLeftOnRectangleIcon
+    ArrowLeftOnRectangleIcon,
+    ArrowRightIcon,
+    ChartBarIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from "next/navigation";
 
@@ -55,9 +57,9 @@ export default function ApplicantDashboardPage() {
 
     useEffect(() => {
         const fetchDashboardData = async () => {
-            if (!user) return;
+        if (!user) return;
 
-            try {
+        try {
                 // デモ用のデータ
                 setStats({
                     totalApplications: 3,
@@ -113,12 +115,12 @@ export default function ApplicantDashboardPage() {
                         type: "profile"
                     }
                 ]);
-            } catch (error) {
+        } catch (error) {
                 console.error('Error fetching dashboard data:', error);
                 setError("データの取得中にエラーが発生しました。");
             } finally {
                 setIsLoading(false);
-            }
+        }
         };
 
         fetchDashboardData();
@@ -212,7 +214,7 @@ export default function ApplicantDashboardPage() {
                 }
             />
 
-            <main className="max-w-7xl mx-auto p-6">
+            <main className="max-w-7xl mx-auto p-6 mt-32">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     {/* 統計情報 */}
                     <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
@@ -266,17 +268,15 @@ export default function ApplicantDashboardPage() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* 最近の通知 */}
-                    <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center space-x-2">
-                                <BellIcon className="w-5 h-5 text-gray-400" />
-                                <h2 className="text-lg font-medium text-gray-900">最近の通知</h2>
-                            </div>
+                    <div className="bg-white rounded-xl shadow-sm p-6 mt-8">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-medium text-gray-900">通知</h2>
                             <Link
                                 href="/page/dashboard/applicant/notifications"
-                                className="text-sm text-indigo-600 hover:text-indigo-700"
+                                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                             >
                                 すべて表示
+                                <ArrowRightIcon className="ml-2 h-4 w-4" />
                             </Link>
                         </div>
                         <div className="space-y-4">
@@ -311,17 +311,15 @@ export default function ApplicantDashboardPage() {
                     </div>
 
                     {/* 面接スケジュール */}
-                    <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center space-x-2">
-                                <CalendarIcon className="w-5 h-5 text-gray-400" />
-                                <h2 className="text-lg font-medium text-gray-900">面接スケジュール</h2>
-                            </div>
+                    <div className="bg-white rounded-xl shadow-sm p-6 mt-8">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-medium text-gray-900">面接スケジュール</h2>
                             <Link
                                 href="/page/dashboard/applicant/interviews"
-                                className="text-sm text-indigo-600 hover:text-indigo-700"
+                                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                             >
                                 すべて表示
+                                <ArrowRightIcon className="ml-2 h-4 w-4" />
                             </Link>
                         </div>
                         <div className="space-y-4">
@@ -339,44 +337,122 @@ export default function ApplicantDashboardPage() {
                 </div>
 
                 {/* 応募中の企業 */}
-                <div className="mt-8">
-                    <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center space-x-2">
-                                <DocumentTextIcon className="w-5 h-5 text-gray-400" />
-                                <h2 className="text-lg font-medium text-gray-900">応募中の企業</h2>
-                            </div>
-                            <Link
-                                href="/page/dashboard/applicant/applications"
-                                className="text-sm text-indigo-600 hover:text-indigo-700"
+                <div className="bg-white rounded-xl shadow-sm p-6 mt-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-medium text-gray-900">応募中の企業</h2>
+                        <Link
+                            href="/page/dashboard/applicant/applications"
+                            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                        >
+                            すべて表示
+                            <ArrowRightIcon className="ml-2 h-4 w-4" />
+                        </Link>
+                    </div>
+                    <div className="space-y-4">
+                        {applications.map((application) => (
+                            <div
+                                key={application.id}
+                                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
                             >
-                                すべて表示
-                            </Link>
-                        </div>
-                        <div className="space-y-4">
-                            {applications.map((application) => (
-                                <div
-                                    key={application.id}
-                                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                                >
-                                    <div>
-                                        <div className="font-medium text-gray-900">
-                                            {application.companyName}
-                                        </div>
-                                        <div className="text-sm text-gray-500">
-                                            {application.position}
-                                        </div>
+                                <div>
+                                    <div className="font-medium text-gray-900">
+                                        {application.companyName}
                                     </div>
-                                    <div className="flex items-center space-x-4">
-                                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(application.status)}`}>
-                                            {getStatusLabel(application.status)}
-                                        </div>
-                                        <div className="text-sm text-gray-500">
-                                            {new Date(application.lastUpdated).toLocaleDateString('ja-JP')}
-                                        </div>
+                                    <div className="text-sm text-gray-500">
+                                        {application.position}
                                     </div>
                                 </div>
-                            ))}
+                                    <div className="flex items-center space-x-4">
+                                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(application.status)}`}>
+                                        {getStatusLabel(application.status)}
+                                    </div>
+                                    <div className="text-sm text-gray-500">
+                                        {new Date(application.lastUpdated).toLocaleDateString('ja-JP')}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* テスト関連セクション */}
+                <div className="mt-12">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-6">テスト関連</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* 受験予定のテスト */}
+                        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center space-x-2">
+                                    <DocumentTextIcon className="w-5 h-5 text-gray-400" />
+                                    <h3 className="text-lg font-medium text-gray-900">受験予定のテスト</h3>
+                                </div>
+                                <Link
+                                    href="/page/dashboard/applicant/skilltest/exam"
+                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                                >
+                                    テストを受験
+                                    <ArrowRightIcon className="ml-2 h-4 w-4" />
+                                </Link>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div>
+                                        <div className="font-medium text-gray-900">技術テスト</div>
+                                        <div className="text-sm text-gray-500">株式会社ABC</div>
+                                    </div>
+                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                        未受験
+                                    </span>
+                                        </div>
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                        <div>
+                                        <div className="font-medium text-gray-900">適性テスト</div>
+                                        <div className="text-sm text-gray-500">株式会社XYZ</div>
+                                    </div>
+                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                        完了
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* テスト結果 */}
+                        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center space-x-2">
+                                    <ChartBarIcon className="w-5 h-5 text-gray-400" />
+                                    <h3 className="text-lg font-medium text-gray-900">テスト結果</h3>
+                                </div>
+                                <Link
+                                    href="/page/dashboard/applicant/skilltest/result"
+                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                                >
+                                    すべて表示
+                                    <ArrowRightIcon className="ml-2 h-4 w-4" />
+                                </Link>
+                                        </div>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div>
+                                        <div className="font-medium text-gray-900">技術テスト</div>
+                                        <div className="text-sm text-gray-500">株式会社ABC</div>
+                                    </div>
+                                    <div className="flex items-center space-x-4">
+                                        <span className="text-lg font-semibold text-indigo-600">85点</span>
+                                        <span className="text-sm text-gray-500">2024/03/15</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div>
+                                        <div className="font-medium text-gray-900">適性テスト</div>
+                                        <div className="text-sm text-gray-500">株式会社XYZ</div>
+                                    </div>
+                                    <div className="flex items-center space-x-4">
+                                        <span className="text-lg font-semibold text-indigo-600">92点</span>
+                                        <span className="text-sm text-gray-500">2024/03/14</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
