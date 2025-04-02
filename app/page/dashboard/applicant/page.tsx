@@ -14,9 +14,11 @@ import {
     Cog6ToothIcon,
     ArrowLeftOnRectangleIcon,
     ArrowRightIcon,
-    ChartBarIcon
+    ChartBarIcon,
+    BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from "next/navigation";
+import { supabase } from "@/app/utils/supabase";
 
 interface DashboardStats {
     totalApplications: number;
@@ -41,6 +43,14 @@ interface CompanyApplication {
     lastUpdated: string;
 }
 
+interface Test {
+    id: string;
+    title: string;
+    company_name: string;
+    status: 'upcoming' | 'available';
+    scheduled_date?: string;
+}
+
 export default function ApplicantDashboardPage() {
     const { user, signOut } = useAuth();
     const router = useRouter();
@@ -54,12 +64,15 @@ export default function ApplicantDashboardPage() {
     });
     const [recentNotifications, setRecentNotifications] = useState<RecentNotification[]>([]);
     const [applications, setApplications] = useState<CompanyApplication[]>([]);
+    const [upcomingTests, setUpcomingTests] = useState<Test[]>([]);
+    const [availableTests, setAvailableTests] = useState<Test[]>([]);
+    const [userId, setUserId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
-        if (!user) return;
+            if (!user) return;
 
-        try {
+            try {
                 // デモ用のデータ
                 setStats({
                     totalApplications: 3,
@@ -115,16 +128,90 @@ export default function ApplicantDashboardPage() {
                         type: "profile"
                     }
                 ]);
-        } catch (error) {
+
+                await fetchTests(user.id);
+            } catch (error) {
                 console.error('Error fetching dashboard data:', error);
                 setError("データの取得中にエラーが発生しました。");
             } finally {
                 setIsLoading(false);
-        }
+            }
         };
 
+        const fetchUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUserId(user.id);
+            }
+        };
+
+        fetchUser();
         fetchDashboardData();
     }, [user]);
+
+    const fetchTests = async (userId: string) => {
+        try {
+            // 受験予定のテストを取得
+            const { data: upcomingData, error: upcomingError } = await supabase
+                .from('skill_tests')
+                .select(`
+                    id,
+                    title,
+                    companies (
+                        name
+                    ),
+                    scheduled_date
+                `)
+                .eq('status', 'upcoming')
+                .order('scheduled_date', { ascending: true })
+                .limit(5);
+
+            if (upcomingError) {
+                console.error('Error fetching upcoming tests:', upcomingError);
+                return;
+            }
+
+            // 受験可能なテストを取得（未受験のもの）
+            const { data: availableData, error: availableError } = await supabase
+                .from('skill_tests')
+                .select(`
+                    id,
+                    title,
+                    companies (
+                        name
+                    )
+                `)
+                .not('id', 'in', (
+                    supabase
+                        .from('test_results')
+                        .select('test_id')
+                        .eq('user_id', userId)
+                ))
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            if (availableError) {
+                console.error('Error fetching available tests:', availableError);
+                return;
+            }
+
+            setUpcomingTests(upcomingData.map(test => ({
+                id: test.id,
+                title: test.title,
+                company_name: test.companies?.[0]?.name || '不明な企業',
+                status: 'upcoming',
+                scheduled_date: test.scheduled_date
+            })));
+            setAvailableTests(availableData.map(test => ({
+                id: test.id,
+                title: test.title,
+                company_name: test.companies?.[0]?.name || '不明な企業',
+                status: 'available'
+            })));
+        } catch (error) {
+            console.error('Error fetching tests:', error);
+        }
+    };
 
     const handleSignOut = async () => {
         try {
@@ -362,7 +449,7 @@ export default function ApplicantDashboardPage() {
                                         {application.position}
                                     </div>
                                 </div>
-                                    <div className="flex items-center space-x-4">
+                                <div className="flex items-center space-x-4">
                                     <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(application.status)}`}>
                                         {getStatusLabel(application.status)}
                                     </div>
@@ -386,33 +473,19 @@ export default function ApplicantDashboardPage() {
                                     <DocumentTextIcon className="w-5 h-5 text-gray-400" />
                                     <h3 className="text-lg font-medium text-gray-900">受験予定のテスト</h3>
                                 </div>
-                                <Link
-                                    href="/page/dashboard/applicant/skilltest/exam"
-                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                                >
-                                    テストを受験
-                                    <ArrowRightIcon className="ml-2 h-4 w-4" />
-                                </Link>
                             </div>
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <div className="font-medium text-gray-900">技術テスト</div>
-                                        <div className="text-sm text-gray-500">株式会社ABC</div>
-                                    </div>
-                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                                        未受験
-                                    </span>
-                                        </div>
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                {upcomingTests.map((test) => (
+                                    <div key={test.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                                         <div>
-                                        <div className="font-medium text-gray-900">適性テスト</div>
-                                        <div className="text-sm text-gray-500">株式会社XYZ</div>
+                                            <div className="font-medium text-gray-900">{test.title}</div>
+                                            <div className="text-sm text-gray-500">{test.company_name}</div>
+                                        </div>
+                                        <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                                            未受験
+                                        </span>
                                     </div>
-                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                                        完了
-                                    </span>
-                                </div>
+                                ))}
                             </div>
                         </div>
 
@@ -430,7 +503,7 @@ export default function ApplicantDashboardPage() {
                                     すべて表示
                                     <ArrowRightIcon className="ml-2 h-4 w-4" />
                                 </Link>
-                                        </div>
+                            </div>
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                                     <div>
