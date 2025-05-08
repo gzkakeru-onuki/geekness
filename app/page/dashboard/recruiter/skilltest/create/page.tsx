@@ -216,6 +216,25 @@ export default function SkillTestCreation() {
                 throw new Error('企業情報の取得に失敗しました');
             }
 
+            // 選択された応募者の応募情報から求人IDを取得
+            const { data: applicationData, error: applicationError } = await supabase
+                .from('applications')
+                .select('job_id')
+                .eq('applicant_id', selectedUser)
+                .eq('company_id', recruiterData.company_id)
+                .single();
+
+            if (applicationError) {
+                console.error('応募情報の取得に失敗しました:', applicationError);
+                throw new Error('応募情報の取得に失敗しました');
+            }
+
+            if (!applicationData || !applicationData.job_id) {
+                throw new Error('求人情報が見つかりません');
+            }
+
+            const jobId = applicationData.job_id;
+
             // スキルテストをDBに保存
             const { data: testData, error: testError } = await supabase
                 .from('skill_tests')
@@ -230,8 +249,10 @@ export default function SkillTestCreation() {
                     question_count: questionCount,
                     time_limit: timeLimit,
                     company_id: recruiterData.company_id,
+                    job_id: jobId,
                     created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
+                    status: 1//受験可能
                 })
                 .select()
                 .single();
@@ -278,7 +299,7 @@ export default function SkillTestCreation() {
 
             console.log('✅ テスト作成完了:', testData);
             alert('テストが正常に作成されました');
-            router.push('/page/dashboard/?type=recruiter');
+            router.push('/page/dashboard/recruiter');
 
         } catch (error: any) {
             console.error('❌ テスト確定エラー:', error);

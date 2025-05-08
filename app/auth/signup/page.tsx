@@ -84,8 +84,7 @@ export default function Signup() {
                 const { data: applicantData, error: applicantError } = await supabase
                     .from('applicant_profiles')
                     .insert({
-                        id: data.user?.id,
-                        auth_user_id: data.user?.id,
+                        id: data.user?.id,                        
                         applicant_firstname: firstName,
                         applicant_lastname: lastName,
                         applicant_email: email,
@@ -113,7 +112,7 @@ export default function Signup() {
                 }
 
                 console.log("Profile inserted successfully");
-                router.push("/page/dashboard?type=applicant");
+                router.push("/page/dashboard/applicant");
 
             } else if (activeTab === "company") {
                 // 1. まず会社情報を登録
@@ -169,7 +168,7 @@ export default function Signup() {
                 }
 
                 console.log("Company and Profile inserted successfully");
-                router.push("/page/dashboard?type=recruiter");
+                router.push("/page/dashboard/recruiter");
             }
 
         } catch (error: any) {

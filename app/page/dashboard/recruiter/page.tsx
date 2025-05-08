@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/contexts/AuthContext";
+import { supabase } from "@/app/utils/supabase";
 
 interface Notification {
     id: string;
@@ -50,6 +51,56 @@ interface UpcomingInterview {
     location?: string;
 }
 
+interface TestResult {
+    id: string;
+    title: string;
+    applicant_name: string;
+    score: number;
+    completed_at: string;
+}
+
+interface TestResponseData {
+    id: string;
+    score: number;
+    updated_at: string;
+    applicant_id: string;
+    skill_tests: {
+        id: string;
+        title: string;
+        company_id: string;
+    };
+}
+
+interface ApplicantProfile {
+    id: string;
+    applicant_firstname: string;
+    applicant_lastname: string;
+}
+
+interface Job {
+    id: string;
+    title: string;
+    status: 'draft' | 'published' | 'closed';
+    created_at: string;
+}
+
+// 日付フォーマット用のヘルパー関数を追加
+const formatDate = (dateString: string | null): string => {
+    if (!dateString) return '日付なし';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '無効な日付';
+        return date.toLocaleDateString('ja-JP', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    } catch (error) {
+        console.error('Date formatting error:', error);
+        return '日付エラー';
+    }
+};
+
 export default function RecruiterDashboard() {
     const { user, signOut } = useAuth();
     const router = useRouter();
@@ -61,12 +112,16 @@ export default function RecruiterDashboard() {
         upcomingInterviews: 0,
         averageScore: 0
     });
-    const [recentApplicants, setRecentApplicants] = useState<RecentApplicant[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [recentApplicants, setRecentApplicants] = useState<RecentApplicant[]>([]);
     const [upcomingInterviews, setUpcomingInterviews] = useState<UpcomingInterview[]>([]);
+    const [testResults, setTestResults] = useState<TestResult[]>([]);
+    const [recentJobs, setRecentJobs] = useState<Job[]>([]);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
+            if (!user) return;
+
             try {
                 setIsLoading(true);
                 setError(null);
@@ -156,6 +211,29 @@ export default function RecruiterDashboard() {
                         isRead: true
                     }
                 ]);
+
+                // 企業IDの取得
+                const { data: companyData, error: companyError } = await supabase
+                    .from('recruiter_profiles')
+                    .select('company_id')
+                    .eq('id', user.id)
+                    .single();
+
+                if (companyError) throw companyError;
+
+                // 最新の求人情報を4件取得
+                const { data: jobsData, error: jobsError } = await supabase
+                    .from('jobs')
+                    .select('id, title, status, created_at')
+                    .eq('company_id', companyData.company_id)
+                    .order('created_at', { ascending: false })
+                    .limit(4);
+
+                if (jobsError) throw jobsError;
+
+                setRecentJobs(jobsData || []);
+
+                await fetchTestResults();
             } catch (error) {
                 console.error('Error fetching dashboard data:', error);
                 setError("データの取得中にエラーが発生しました。");
@@ -165,7 +243,77 @@ export default function RecruiterDashboard() {
         };
 
         fetchDashboardData();
-    }, []);
+    }, [user]);
+
+    const fetchTestResults = async () => {
+        try {
+            // まず企業のIDを取得
+            const { data: companyData, error: companyError } = await supabase
+                .from('recruiter_profiles')
+                .select('id, company_id')
+                .eq('id', user?.id)
+                .single();
+
+            if (companyError) {
+                console.error('Error fetching company data:', companyError);
+                return;
+            }
+
+            // 企業のテスト結果を取得
+            const { data: resultsData, error: resultsError } = await supabase
+                .from('test_responses')
+                .select(`
+                    id,
+                    score,
+                    updated_at,
+                    applicant_id,
+                    skill_tests!inner (
+                        id,
+                        title,
+                        company_id
+                    )
+                `)
+                .eq('skill_tests.company_id', companyData.company_id)
+                .eq('skill_tests.status', false)
+                .order('updated_at', { ascending: false })
+                .limit(5);
+
+            if (resultsError || !resultsData) {
+                console.error('Error fetching test results:', resultsError);
+                return;
+            }
+
+            // テスト結果の応募者情報を取得
+            const applicantIds = resultsData.map(result => result.applicant_id).filter(Boolean);
+            const { data: applicantData, error: applicantError } = await supabase
+                .from('applicant_profiles')
+                .select('id, applicant_firstname, applicant_lastname')
+                .in('id', applicantIds);
+
+            if (applicantError || !applicantData) {
+                console.error('Error fetching applicant data:', applicantError);
+                return;
+            }
+
+            // 応募者情報をマップに変換
+            const applicantMap = new Map(applicantData.map(applicant => [applicant.id, applicant]));
+
+            const formattedResults: TestResult[] = resultsData.map(result => {
+                const applicant = applicantMap.get(result.applicant_id);
+                return {
+                    id: result.id,
+                    title: result.skill_tests.title,
+                    applicant_name: applicant ? `${applicant.applicant_lastname} ${applicant.applicant_firstname}` : '不明な応募者',
+                    score: result.score || 0,
+                    completed_at: result.updated_at || ''
+                };
+            });
+
+            setTestResults(formattedResults);
+        } catch (error) {
+            console.error('Error fetching test results:', error);
+        }
+    };
 
     const handleSignOut = async () => {
         try {
@@ -278,7 +426,7 @@ export default function RecruiterDashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* 最近の応募者 */}
+                    {/* 最近の応募者 */}
                     <div className="bg-white rounded-xl shadow-sm p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-medium text-gray-900">最近の応募者</h2>
@@ -289,14 +437,14 @@ export default function RecruiterDashboard() {
                                 すべて表示
                                 <ArrowRightIcon className="ml-2 h-4 w-4" />
                             </Link>
-                    </div>
-                    <div className="space-y-4">
-                        {recentApplicants.map((applicant) => (
-                            <div
-                                key={applicant.id}
+                        </div>
+                        <div className="space-y-4">
+                            {recentApplicants.map((applicant) => (
+                                <div
+                                    key={applicant.id}
                                     className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                            >
-                                        <div>
+                                >
+                                    <div>
                                         <h3 className="font-medium text-gray-900">{applicant.name}</h3>
                                         <p className="text-sm text-gray-500">{applicant.position}</p>
                                     </div>
@@ -322,7 +470,7 @@ export default function RecruiterDashboard() {
                                 すべて表示
                                 <ArrowRightIcon className="ml-2 h-4 w-4" />
                             </Link>
-                                        </div>
+                        </div>
                         <div className="space-y-4">
                             {upcomingInterviews.map((interview) => (
                                 <div
@@ -413,37 +561,42 @@ export default function RecruiterDashboard() {
                         </div>
                     </div>
 
-                    {/* 受験者招待 */}
+                    {/* 求人管理 */}
                     <div className="bg-white rounded-xl shadow-sm p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-medium text-gray-900">受験者招待</h2>
+                            <h2 className="text-lg font-medium text-gray-900">求人管理</h2>
                             <Link
-                                href="/page/dashboard/recruiter/invite"
+                                href="/page/dashboard/recruiter/jobs"
                                 className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                             >
-                                招待する
+                                全て表示
                                 <ArrowRightIcon className="ml-2 h-4 w-4" />
                             </Link>
                         </div>
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                <div>
-                                    <div className="font-medium text-gray-900">招待済み</div>
-                                    <div className="text-sm text-gray-500">5名</div>
-                                </div>
-                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                                    未受験: 3名
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                <div>
-                                    <div className="font-medium text-gray-900">受験済み</div>
-                                    <div className="text-sm text-gray-500">2名</div>
-                                </div>
-                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                                    完了
-                                </span>
-                            </div>
+                            {recentJobs.map((job) => (
+                                <Link
+                                    key={job.id}
+                                    href={`/page/dashboard/recruiter/jobs/${job.id}/edit`}
+                                    className="block p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="font-medium text-gray-900">{job.title}</div>
+                                            <div className="text-sm text-gray-500 mt-1">
+                                                作成日: {formatDate(job.created_at)}
+                                            </div>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${job.status === 'published' ? 'bg-green-100 text-green-800' :
+                                                job.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                                                    'bg-gray-100 text-gray-800'
+                                            }`}>
+                                            {job.status === 'published' ? '公開中' :
+                                                job.status === 'draft' ? '下書き' : '終了'}
+                                        </span>
+                                    </div>
+                                </Link>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -453,78 +606,88 @@ export default function RecruiterDashboard() {
                     <h2 className="text-xl font-semibold text-gray-900 mb-6">テスト関連</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* スキルテスト作成 */}
-                        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-all duration-300">
                             <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center space-x-2">
-                                    <DocumentTextIcon className="w-5 h-5 text-gray-400" />
-                                    <h3 className="text-lg font-medium text-gray-900">スキルテスト</h3>
+                                <div className="flex items-center space-x-3">
+                                    <div className="bg-indigo-100 p-2 rounded-lg">
+                                        <DocumentTextIcon className="w-6 h-6 text-indigo-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-900">スキルテスト</h3>
+                                        <p className="text-sm text-gray-500">技術スキルを評価するテストを作成</p>
+                                    </div>
                                 </div>
                                 <Link
                                     href="/page/dashboard/recruiter/skilltest/create"
-                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm hover:shadow-md"
                                 >
                                     テストを作成
                                     <ArrowRightIcon className="ml-2 h-4 w-4" />
                                 </Link>
                             </div>
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <div className="font-medium text-gray-900">技術テスト</div>
-                                        <div className="text-sm text-gray-500">問題数: 10問</div>
-                                    </div>
-                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                                        編集可能
-                                    </span>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                    <div className="text-sm font-medium text-gray-900">作成済みテスト</div>
+                                    <div className="text-2xl font-bold text-indigo-600 mt-1">12</div>
                                 </div>
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <div className="font-medium text-gray-900">適性テスト</div>
-                                        <div className="text-sm text-gray-500">問題数: 15問</div>
-                                    </div>
-                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                                        公開中
-                                    </span>
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                    <div className="text-sm font-medium text-gray-900">受験者数</div>
+                                    <div className="text-2xl font-bold text-indigo-600 mt-1">45</div>
                                 </div>
                             </div>
                         </div>
 
                         {/* テスト結果 */}
-                        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+                        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-all duration-300">
                             <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center space-x-2">
-                                    <ChartBarIcon className="w-5 h-5 text-gray-400" />
-                                    <h3 className="text-lg font-medium text-gray-900">テスト結果</h3>
+                                <div className="flex items-center space-x-3">
+                                    <div className="bg-green-100 p-2 rounded-lg">
+                                        <ChartBarIcon className="w-6 h-6 text-green-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-900">テスト結果</h3>
+                                        <p className="text-sm text-gray-500">受験者のスコアを確認</p>
+                                    </div>
                                 </div>
                                 <Link
                                     href="/page/dashboard/recruiter/skilltest/result"
-                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm hover:shadow-md"
                                 >
                                     すべて表示
                                     <ArrowRightIcon className="ml-2 h-4 w-4" />
                                 </Link>
                             </div>
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <div className="font-medium text-gray-900">技術テスト</div>
-                                        <div className="text-sm text-gray-500">平均点: 85点</div>
+                                {testResults.length > 0 ? (
+                                    testResults.map((result) => (
+                                        <div key={result.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                            <div className="flex items-center space-x-4">
+                                                <div className="bg-white p-2 rounded-lg shadow-sm">
+                                                    <ChartBarIcon className="w-5 h-5 text-indigo-600" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-gray-900">{result.title}</div>
+                                                    <div className="text-sm text-gray-500">{result.applicant_name}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center space-x-4">
+                                                <div className="text-right">
+                                                    <div className="text-lg font-semibold text-indigo-600">{result.score}点</div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {new Date(result.completed_at).toLocaleDateString('ja-JP')}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-8">
+                                        <ChartBarIcon className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                                        <div className="text-sm text-gray-500">
+                                            現在、テスト結果はありません。
+                                        </div>
                                     </div>
-                                    <div className="flex items-center space-x-4">
-                                        <span className="text-lg font-semibold text-indigo-600">2名</span>
-                                        <span className="text-sm text-gray-500">受験済み</span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <div className="font-medium text-gray-900">適性テスト</div>
-                                        <div className="text-sm text-gray-500">平均点: 92点</div>
-                                    </div>
-                                    <div className="flex items-center space-x-4">
-                                        <span className="text-lg font-semibold text-indigo-600">2名</span>
-                                        <span className="text-sm text-gray-500">受験済み</span>
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>

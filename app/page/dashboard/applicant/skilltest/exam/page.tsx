@@ -49,37 +49,64 @@ interface TestSelectionModalProps {
 // テスト選択用のモーダルコンポーネントを追加
 const TestSelectionModal = ({ tests, onSelect, onClose }: TestSelectionModalProps) => {
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">受験するテストを選択</h2>
-                <div className="grid gap-4 mb-6">
+        <div
+            className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-start justify-center z-50 p-4 overflow-y-auto"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
+        >
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 w-full max-w-xl mt-20 mb-8 flex flex-col shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-gray-800">受験するテストを選択</h2>
+                    <button
+                        onClick={onClose}
+                        className="text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="space-y-3">
                     {tests.map((test) => (
                         <button
                             key={test.id}
                             onClick={() => onSelect(test.test_id)}
-                            className="bg-white border-2 border-indigo-100 hover:border-indigo-500 rounded-xl p-4 text-left transition-all duration-300"
+                            className="w-full bg-white/50 backdrop-blur-sm border-2 border-indigo-100 hover:border-indigo-500 rounded-xl p-4 text-left transition-all duration-300 hover:shadow-md"
                         >
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <h3 className="font-semibold text-lg text-gray-800">
+                            <div className="flex justify-between items-start">
+                                <div className="space-y-2">
+                                    <h3 className="font-semibold text-base text-gray-800">
                                         {test.skill_tests.title}
                                     </h3>
-                                    <div className="mt-2 flex gap-4 text-sm text-gray-600">
-                                        <span>言語: {test.skill_tests.programming_language}</span>
-                                        <span>難易度: {test.skill_tests.difficulty}</span>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs bg-blue-50 text-blue-700">
+                                            <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                                            </svg>
+                                            {test.skill_tests.programming_language}
+                                        </span>
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs bg-purple-50 text-purple-700">
+                                            <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                            </svg>
+                                            {test.skill_tests.difficulty}
+                                        </span>
                                     </div>
                                 </div>
-                                <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                                 </svg>
                             </div>
                         </button>
                     ))}
                 </div>
-                <div className="flex justify-end">
+                <div className="flex justify-end mt-4 pt-4 border-t">
                     <button
                         onClick={onClose}
-                        className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                        className="px-4 py-1.5 text-sm text-gray-600 hover:text-gray-800 font-medium transition-colors"
                     >
                         キャンセル
                     </button>
@@ -97,6 +124,7 @@ export default function ExamPage() {
     const [timeLeft, setTimeLeft] = useState(3600); // 60分 = 3600秒
     const [isStarted, setIsStarted] = useState(false); // テスト開始状態
     const [isEditorDisabled, setIsEditorDisabled] = useState(true); // エディタの編集可否
+    const [isSubmitting, setIsSubmitting] = useState(false); // 送信中の状態
     const [testInfo, setTestInfo] = useState<TestInfo>({
         title: "",
         category: "",
@@ -252,8 +280,11 @@ export default function ExamPage() {
                 alert("すべてのフィールドを入力してください。");
                 return;
             }
-            window.confirm("解答を送信しますか？");
-            alert("採点します...");
+            if (!window.confirm("解答を送信しますか？")) {
+                return;
+            }
+
+            setIsSubmitting(true);
 
             // GeminiAPIを呼び出して採点
             const response = await fetch('/api/gemini', {
@@ -365,11 +396,25 @@ export default function ExamPage() {
                 alert("解答の送信に失敗しました。");
                 return;
             }
-            alert("採点完了しました!");
+
+            // テストのステータスを更新
+            const { error: updateError } = await supabase
+                .from('test_applicants')
+                .update({ status: 'completed' })
+                .eq('id', testApplicant.id);
+
+            if (updateError) {
+                console.error("Error updating test status:", updateError);
+            }
+
+            // 送信完了後、ダッシュボードに遷移
+            window.location.href = '/page/dashboard/applicant';
 
         } catch (error) {
             console.error("Error in handleSubmit:", error);
             alert("エラーが発生しました。");
+        } finally {
+            setIsSubmitting(false);
         }
     }, [name, email, question, testId]);
 
@@ -604,11 +649,11 @@ export default function ExamPage() {
                                     onValueChange={(code) => setQuestion(code)}
                                     highlight={code => highlight(code, languages.js, 'javascript')}
                                     padding={10}
-                                    disabled={isEditorDisabled}
+                                    disabled={isEditorDisabled || isSubmitting}
                                     style={{
                                         fontFamily: '"Fira code", "Fira Mono", monospace',
                                         fontSize: 14,
-                                        backgroundColor: isEditorDisabled ? '#f5f5f5' : '#ffffff',
+                                        backgroundColor: isEditorDisabled || isSubmitting ? '#f5f5f5' : '#ffffff',
                                         borderRadius: '8px',
                                         border: '1px solid #e2e8f0',
                                         minHeight: '400px',
@@ -621,15 +666,25 @@ export default function ExamPage() {
                                 <button
                                     onClick={() => window.location.reload()}
                                     className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-300"
+                                    disabled={isSubmitting}
                                 >
                                     キャンセル
                                 </button>
                                 <button
                                     onClick={handleSubmit}
-                                    disabled={!isStarted}
-                                    className="px-8 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={!isStarted || isSubmitting}
+                                    className="px-8 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed relative"
                                 >
-                                    解答を送信
+                                    {isSubmitting ? (
+                                        <>
+                                            <span className="opacity-0">解答を送信</span>
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        '解答を送信'
+                                    )}
                                 </button>
                             </div>
                         </>
