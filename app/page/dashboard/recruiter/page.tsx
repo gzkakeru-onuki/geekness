@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
@@ -117,6 +117,76 @@ export default function RecruiterDashboard() {
     const [upcomingInterviews, setUpcomingInterviews] = useState<UpcomingInterview[]>([]);
     const [testResults, setTestResults] = useState<TestResult[]>([]);
     const [recentJobs, setRecentJobs] = useState<Job[]>([]);
+
+    const fetchTestResults = useCallback(async () => {
+        try {
+            // まず企業のIDを取得
+            const { data: companyData, error: companyError } = await supabase
+                .from('recruiter_profiles')
+                .select('id, company_id')
+                .eq('id', user?.id)
+                .single();
+
+            if (companyError) {
+                console.error('Error fetching company data:', companyError);
+                return;
+            }
+
+            // 企業のテスト結果を取得
+            const { data: resultsData, error: resultsError } = await supabase
+                .from('test_responses')
+                .select(`
+                    id,
+                    score,
+                    updated_at,
+                    applicant_id,
+                    skill_tests!inner (
+                        id,
+                        title,
+                        company_id
+                    )
+                `)
+                .eq('skill_tests.company_id', companyData.company_id)
+                .eq('skill_tests.status', false)
+                .order('updated_at', { ascending: false })
+                .limit(5);
+
+            if (resultsError || !resultsData) {
+                console.error('Error fetching test results:', resultsError);
+                return;
+            }
+
+            // テスト結果の応募者情報を取得
+            const applicantIds = resultsData.map(result => result.applicant_id).filter(Boolean);
+            const { data: applicantData, error: applicantError } = await supabase
+                .from('applicant_profiles')
+                .select('id, applicant_firstname, applicant_lastname')
+                .in('id', applicantIds);
+
+            if (applicantError || !applicantData) {
+                console.error('Error fetching applicant data:', applicantError);
+                return;
+            }
+
+            // 応募者情報をマップに変換
+            const applicantMap = new Map(applicantData.map(applicant => [applicant.id, applicant]));
+
+            const formattedResults: TestResult[] = resultsData.map(result => {
+                const applicant = applicantMap.get(result.applicant_id);
+                return {
+                    id: result.id,
+                    title: result.skill_tests.title,
+                    applicant_name: applicant ? `${applicant.applicant_lastname} ${applicant.applicant_firstname}` : '不明な応募者',
+                    score: result.score || 0,
+                    completed_at: result.updated_at || ''
+                };
+            });
+
+            setTestResults(formattedResults);
+        } catch (error) {
+            console.error('Error fetching test results:', error);
+        }
+    }, [user?.id]);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -243,77 +313,7 @@ export default function RecruiterDashboard() {
         };
 
         fetchDashboardData();
-    }, [user]);
-
-    const fetchTestResults = async () => {
-        try {
-            // まず企業のIDを取得
-            const { data: companyData, error: companyError } = await supabase
-                .from('recruiter_profiles')
-                .select('id, company_id')
-                .eq('id', user?.id)
-                .single();
-
-            if (companyError) {
-                console.error('Error fetching company data:', companyError);
-                return;
-            }
-
-            // 企業のテスト結果を取得
-            const { data: resultsData, error: resultsError } = await supabase
-                .from('test_responses')
-                .select(`
-                    id,
-                    score,
-                    updated_at,
-                    applicant_id,
-                    skill_tests!inner (
-                        id,
-                        title,
-                        company_id
-                    )
-                `)
-                .eq('skill_tests.company_id', companyData.company_id)
-                .eq('skill_tests.status', false)
-                .order('updated_at', { ascending: false })
-                .limit(5);
-
-            if (resultsError || !resultsData) {
-                console.error('Error fetching test results:', resultsError);
-                return;
-            }
-
-            // テスト結果の応募者情報を取得
-            const applicantIds = resultsData.map(result => result.applicant_id).filter(Boolean);
-            const { data: applicantData, error: applicantError } = await supabase
-                .from('applicant_profiles')
-                .select('id, applicant_firstname, applicant_lastname')
-                .in('id', applicantIds);
-
-            if (applicantError || !applicantData) {
-                console.error('Error fetching applicant data:', applicantError);
-                return;
-            }
-
-            // 応募者情報をマップに変換
-            const applicantMap = new Map(applicantData.map(applicant => [applicant.id, applicant]));
-
-            const formattedResults: TestResult[] = resultsData.map(result => {
-                const applicant = applicantMap.get(result.applicant_id);
-                return {
-                    id: result.id,
-                    title: result.skill_tests.title,
-                    applicant_name: applicant ? `${applicant.applicant_lastname} ${applicant.applicant_firstname}` : '不明な応募者',
-                    score: result.score || 0,
-                    completed_at: result.updated_at || ''
-                };
-            });
-
-            setTestResults(formattedResults);
-        } catch (error) {
-            console.error('Error fetching test results:', error);
-        }
-    };
+    }, [user, fetchTestResults]);
 
     const handleSignOut = async () => {
         try {
@@ -588,8 +588,8 @@ export default function RecruiterDashboard() {
                                             </div>
                                         </div>
                                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${job.status === 'published' ? 'bg-green-100 text-green-800' :
-                                                job.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-gray-100 text-gray-800'
+                                            job.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-gray-100 text-gray-800'
                                             }`}>
                                             {job.status === 'published' ? '公開中' :
                                                 job.status === 'draft' ? '下書き' : '終了'}

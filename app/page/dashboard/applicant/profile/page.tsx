@@ -249,7 +249,7 @@ export default function ApplicantProfile() {
 
         fetchProfile();
         fetchChallengeResults();
-    }, []);
+    }, [user]);
 
     const fetchChallengeResults = async () => {
         try {

@@ -48,33 +48,67 @@ const PreviewImage = ({ src, alt, className }: { src: string | null, alt: string
     );
 };
 
-export default function JobDetailPage({ params }: { params: { id: string } }) {
+export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
-    const [job, setJob] = useState<any>(null);
+    const [job, setJob] = useState<JobTemplate | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [jobId, setJobId] = useState<string>('');
 
     useEffect(() => {
-        const fetchJob = async () => {
+        const initializeParams = async () => {
+            const resolvedParams = await params;
+            setJobId(resolvedParams.id);
+        };
+        initializeParams();
+    }, [params]);
+
+    useEffect(() => {
+        if (!jobId) return;
+
+        const fetchJobData = async () => {
             try {
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError) throw sessionError;
+                if (!session) {
+                    router.push('/auth/login');
+                    return;
+                }
+
+                const { data: recruiterProfile, error: profileError } = await supabase
+                    .from('recruiter_profiles')
+                    .select('company_id')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (profileError) throw profileError;
+                if (!recruiterProfile) {
+                    throw new Error('採用担当者プロフィールが見つかりません');
+                }
+
                 const { data, error } = await supabase
                     .from('jobs')
                     .select('*')
-                    .eq('id', params.id)
+                    .eq('id', jobId)
+                    .eq('company_id', recruiterProfile.company_id)
                     .single();
 
                 if (error) throw error;
+                if (!data) {
+                    throw new Error('求人情報が見つかりません');
+                }
+
                 setJob(data);
             } catch (error) {
                 console.error('求人取得エラー:', error);
-                setError('求人の取得に失敗しました');
+                setError(error instanceof Error ? error.message : '求人の取得に失敗しました');
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchJob();
-    }, [params.id]);
+        fetchJobData();
+    }, [jobId, router]);
 
     if (isLoading) {
         return (
@@ -118,7 +152,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                     <div className="flex gap-4">
                         <Button
                             variant="outline"
-                            onClick={() => router.push(`/page/dashboard/recruiter/jobs/${params.id}/edit`)}
+                            onClick={() => router.push(`/page/dashboard/recruiter/jobs/${jobId}/edit`)}
                             className="border-gray-300 hover:bg-gray-100"
                         >
                             編集

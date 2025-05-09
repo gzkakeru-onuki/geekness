@@ -282,11 +282,13 @@ interface ImageProps {
 
 const ImageComponent = ({ src, alt, fill = false, className, priority = false }: ImageProps) => {
     return (
-        <img
+        <Image
             src={src}
             alt={alt}
+            fill={fill}
             className={className}
-            style={fill ? { width: '100%', height: '100%', objectFit: 'cover' } : undefined}
+            priority={priority}
+            style={fill ? { objectFit: 'cover' } : undefined}
         />
     );
 };

@@ -16,16 +16,33 @@ import { useAuth } from '@/app/contexts/AuthContext';
 import { supabase } from '@/app/utils/supabase';
 import { Button } from '@/components/ui/button';
 
+interface Company {
+    id: string;
+    name: string;
+}
+
+interface ApplicationData {
+    id: string;
+    job_id: string;
+    company_id: string;
+    status: 'pending' | 'reviewing' | 'interview' | 'rejected' | 'accepted';
+    applied_at: string;
+    message?: string;
+    companies: Company[];
+}
+
 interface Application {
     id: string;
     job_id: string;
     company_id: string;
     status: 'pending' | 'reviewing' | 'interview' | 'rejected' | 'accepted';
     applied_at: string;
-    job: {
+    message?: string;
+    companies?: Company[];
+    job?: {
         title: string;
     };
-    company: {
+    company?: {
         name: string;
     };
 }
@@ -68,7 +85,7 @@ export default function ApplicationsPage() {
                 }
 
                 // 有効なjob_idのみをフィルタリング
-                const validJobIds = appData
+                const validJobIds = (appData as ApplicationData[])
                     .filter(app => app.job_id !== null && app.job_id !== undefined)
                     .map(app => app.job_id);
 
@@ -91,11 +108,15 @@ export default function ApplicationsPage() {
                 }
 
                 // 応募データの整形
-                const formattedApplications = appData.map(app => {
-                    // companiesが配列ではなくオブジェクトとして返ってくる場合の対応
-                    const companyName = app.companies?.name ||
-                        (Array.isArray(app.companies) && app.companies[0]?.name) ||
-                        '不明な企業';
+                const formattedApplications = (appData as ApplicationData[]).map(app => {
+                    // companiesが配列またはオブジェクトとして返ってくる場合の対応
+                    const companyName = (() => {
+                        if (!app.companies) return '不明な企業';
+                        if (Array.isArray(app.companies)) {
+                            return app.companies[0]?.name || '不明な企業';
+                        }
+                        return (app.companies as Company).name || '不明な企業';
+                    })();
 
                     return {
                         id: app.id,
@@ -207,11 +228,11 @@ export default function ApplicationsPage() {
                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
                                         <div>
                                             <h2 className="text-xl font-bold text-gray-900 mb-1">
-                                                {application.job.title}
+                                                {application.job?.title || '不明な求人'}
                                             </h2>
                                             <div className="flex items-center text-gray-500">
                                                 <BuildingOfficeIcon className="h-4 w-4 mr-1" />
-                                                <span>{application.company.name}</span>
+                                                <span>{application.company?.name || '不明な企業'}</span>
                                             </div>
                                         </div>
                                         <div className="mt-4 md:mt-0 flex flex-col md:flex-row gap-2 md:items-center">

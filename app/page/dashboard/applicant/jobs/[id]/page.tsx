@@ -75,7 +75,7 @@ const PreviewImage = ({ src, alt, className }: { src: string | null, alt: string
     );
 };
 
-export default function JobDetailPage({ params }: { params: { id: string } }) {
+export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
     const { user } = useAuth();
     const [job, setJob] = useState<any>(null);
@@ -87,8 +87,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [submitSuccess, setSubmitSuccess] = useState(false);
     const [hasApplied, setHasApplied] = useState(false);
+    const [jobId, setJobId] = useState<string>('');
 
     useEffect(() => {
+        const initializeParams = async () => {
+            const resolvedParams = await params;
+            setJobId(resolvedParams.id);
+        };
+        initializeParams();
+    }, [params]);
+
+    useEffect(() => {
+        if (!jobId) return;
+
         const fetchJob = async () => {
             try {
                 // 求人情報の取得（会社情報も含めて）
@@ -101,7 +112,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                             name
                         )
                     `)
-                    .eq('id', params.id)
+                    .eq('id', jobId)
                     .single();
 
                 if (error) throw error;
@@ -110,15 +121,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
                 // 既に応募済みかチェック
                 if (user && data.company_id) {
-                    // 直接applicationsテーブルを確認
                     const { data: applicationData, error: applicationError } = await supabase
                         .from('applications')
                         .select('id')
                         .eq('applicant_id', user.id)
-                        .eq('job_id', params.id);
+                        .eq('job_id', jobId);
 
                     if (!applicationError && applicationData && applicationData.length > 0) {
-                        console.log('この求人に既に応募済みです:', applicationData);
                         setHasApplied(true);
                     }
                 }
@@ -131,7 +140,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         };
 
         fetchJob();
-    }, [params.id, user]);
+    }, [jobId, user]);
 
     const handleApply = async () => {
         if (!user) {
@@ -144,13 +153,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             setSubmitError(null);
 
             // 既に応募済みかチェック（簡略化したクエリ）
-            console.log('チェック開始:', user.id, job.id);
+            console.log('チェック開始:', user.id, jobId);
 
             const { data: existingApplications, error: checkError } = await supabase
                 .from('applications')
                 .select('*')
                 .eq('applicant_id', user.id)
-                .eq('job_id', params.id);
+                .eq('job_id', jobId);
 
             if (checkError) {
                 console.error('重複チェックエラー:', checkError);
@@ -171,7 +180,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 .from('applications')
                 .insert({
                     id: uuidv4(),
-                    job_id: params.id,
+                    job_id: jobId,
                     applicant_id: user.id,
                     company_id: job.company_id,
                     status: 'pending',

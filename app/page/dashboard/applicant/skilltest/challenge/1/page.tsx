@@ -97,7 +97,7 @@ export default function ChallengeTestPage() {
                 clearInterval(timer);
             }
         };
-    }, [isStarted, timeLeft]);
+    }, [isStarted, timeLeft, handleSubmit]);
 
     // モックの送信処理
     const handleSubmit = useCallback(async () => {

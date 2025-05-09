@@ -293,11 +293,13 @@ interface ImageProps {
 
 const ImageComponent = ({ src, alt, fill = false, className, priority = false }: ImageProps) => {
     return (
-        <img
+        <Image
             src={src}
             alt={alt}
+            fill={fill}
             className={className}
-            style={fill ? { width: '100%', height: '100%', objectFit: 'cover' } : undefined}
+            priority={priority}
+            style={fill ? { objectFit: 'cover' } : undefined}
         />
     );
 };
@@ -319,10 +321,12 @@ const PreviewImage = ({ src, alt, className }: { src: string | null, alt: string
     );
 };
 
-export default function EditJobPage({ params }: { params: { id: string } }) {
+export default function EditJobPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
+    const [job, setJob] = useState<JobTemplate | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [jobId, setJobId] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState<JobTemplate>({
         id: '',
@@ -352,9 +356,18 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
+        const initializeParams = async () => {
+            const resolvedParams = await params;
+            setJobId(resolvedParams.id);
+        };
+        initializeParams();
+    }, [params]);
+
+    useEffect(() => {
+        if (!jobId) return;
+
         const fetchJobData = async () => {
             try {
-                // セッションの確認
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
                 if (sessionError) throw sessionError;
                 if (!session) {
@@ -362,17 +375,6 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                     return;
                 }
 
-                // 求人情報の取得
-                const { data: job, error: jobError } = await supabase
-                    .from('jobs')
-                    .select('*')
-                    .eq('id', params.id)
-                    .single();
-
-                if (jobError) throw jobError;
-                if (!job) throw new Error('求人情報が見つかりません');
-
-                // 採用担当者のプロフィール取得
                 const { data: recruiterProfile, error: profileError } = await supabase
                     .from('recruiter_profiles')
                     .select('company_id')
@@ -380,30 +382,33 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                     .single();
 
                 if (profileError) throw profileError;
-                if (!recruiterProfile) throw new Error('採用担当者プロフィールが見つかりません');
-
-                // 権限チェック
-                if (job.company_id !== recruiterProfile.company_id) {
-                    throw new Error('この求人情報を編集する権限がありません');
+                if (!recruiterProfile) {
+                    throw new Error('採用担当者プロフィールが見つかりません');
                 }
 
-                // フォームデータの設定
-                setFormData({
-                    ...job,
-                    selectedLocations: job.selected_locations || [],
-                    selectedRequirements: job.selected_requirements || [],
-                    selectedBenefits: job.selected_benefits || []
-                });
+                const { data, error } = await supabase
+                    .from('jobs')
+                    .select('*')
+                    .eq('id', jobId)
+                    .eq('company_id', recruiterProfile.company_id)
+                    .single();
+
+                if (error) throw error;
+                if (!data) {
+                    throw new Error('求人情報が見つかりません');
+                }
+
+                setJob(data);
             } catch (error) {
-                console.error('データ取得エラー:', error);
-                setError(error instanceof Error ? error.message : '求人情報の取得に失敗しました');
+                console.error('求人取得エラー:', error);
+                setError(error instanceof Error ? error.message : '求人の取得に失敗しました');
             } finally {
                 setIsLoading(false);
             }
         };
 
         fetchJobData();
-    }, [params.id, router]);
+    }, [jobId, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -453,7 +458,7 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
             const { error: updateError } = await supabase
                 .from('jobs')
                 .update(updateData)
-                .eq('id', params.id)
+                .eq('id', jobId)
                 .eq('company_id', recruiterProfile.company_id);
 
             if (updateError) throw updateError;
@@ -597,7 +602,7 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
             const { error: deleteError } = await supabase
                 .from('jobs')
                 .delete()
-                .eq('id', params.id)
+                .eq('id', jobId)
                 .eq('company_id', recruiterProfile.company_id);
 
             if (deleteError) throw deleteError;
